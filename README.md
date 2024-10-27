@@ -1,5 +1,5 @@
 
-# Project Title
+# The inclusive decay calculation 
 
  **AllClass.py** is the main executable file. 
  At the bottom of the script, you can select the functions you want to execute by running the following command:
@@ -21,3 +21,8 @@ If your environment does not support CUDA( require 11 or above), please:
 
 1. Remove **cupy** from **my_header.py**.
 2. Change **cp** to **np** in **AllClass.py**.
+
+## File import
+
+- Change the path inside the ReadFile function in the class LatticeFermion in file **AllClass.py**.
+- For RBCQCD's data, put the correlator on directry RBCQCD should work.
