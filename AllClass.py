@@ -3,8 +3,7 @@
 ##        @brief
 ##        @author  Wei-Lun Chen (wlchen)
 ##                 $LastChangedBy: wlchen $
-##        @date    $LastChangedDate: 2024-10-17 16:42:21 #$
-##        @version $LastChangedRevision: 2499 $
+##        @date    $LastChangedDate: 2024-12-05 16:42:21 #$
 ##
 
 from my_header import *
@@ -147,16 +146,14 @@ class LatticeFermion:
         self.cof_ex = Prefactor * SEW * VUSPDGEX ** 2 / totaldecaywidth 
         self.cof_in = Prefactor * SEW * VUSPDGIN ** 2 / totaldecaywidth 
         
-    @classmethod
-    def twopt_cosh_function(t , p, TimeSlicing):
+    def twopt_cosh_function(self,t,p):
         a = p['A']  # array of a[i]s
         b = p['M']  # array of E[i]s
         
-        NT = TimeSlicing // 2
+        NT = self.TimeSlicing // 2
         return sum(2* ai * gv.exp(- bi * NT ) * gv.cosh((-1) * bi * ( t - NT )) for ai, bi in zip(a, b))
 
-    @classmethod
-    def twopt_exp_function(t,p):
+    def twopt_exp_function(self,t,p):
         a = p['A'] # array of a[i]s
         b = p['M'] # array of E[i]s
         
@@ -315,13 +312,12 @@ class LatticeFermion:
         else:
             return result
     
-    def correlation(self, ND, **kwargs):
-        
+    def correlation(self, ND, **kwargs): 
         return self.jacknifed_correlation(ND, **kwargs).sdev
 
     def cbar(self, t, ND = 1, t0 = 0.5, **kwargs):
 
-        Debug     =  kwargs.get('Use_Debug', None)
+        Debug     = kwargs.get('Use_Debug', None)
         EO        = kwargs.get('EO', None)
         ext_data  = kwargs.get("Ext_data", None)
         
@@ -341,10 +337,6 @@ class LatticeFermion:
         
     def directsum_chebshev(self, T, ND = 1, t0 = 0.5, **kwargs):
         
-        Debug     = kwargs.get('Use_Debug', None)
-        EO        = kwargs.get('EO', None)
-        ext_data  = kwargs.get("Ext_data", None)
-
         results = []
         
         for t in range(1,T):
@@ -355,23 +347,7 @@ class LatticeFermion:
             
         return np.array(results)
 
-    def make_prior(self, A_list, AE_list, M_list, ME_list, N=1):
-        '''
-        Constructs a dictionary of priors for a fit based on the given lists of parameters.
-
-        Parameters:
-        A_list (list): List of Amplitude 
-        AE_list (list): List of error of amplitude 
-        M_list (list): List of Mass
-        ME_list (list): List of error of mass
-        N (int, optional): Specifies how many state uis fitted. Default is one.
-
-        Raises:
-        ValueError: If the lists do not have the same length or if N is greater than the number of elements in the lists.
-
-        Returns:
-        BufferDict: A BufferDict with keys 'a' and 'b', each containing a list of GVar objects.
-        '''        
+    def make_prior(self, N, A_list, AE_list, M_list, ME_list):
 
         if len(A_list) != len(AE_list) or len(M_list) != len(ME_list) or len(A_list) != len(M_list):
             raise ValueError("All input lists must have the same length")\
@@ -385,54 +361,134 @@ class LatticeFermion:
 
         return prior
 
-    def fit_build_list(self, b, d, A_list, AE_list, M_list, ME_list, data, ND=1, N=1, function_type='exp', set=1):
-        """
-        Generalized function to perform either an exponential or hyperbolic cosine fit.
+    def fit_parameters(self, N, b, d, 
+                       A_list, AE_list, 
+                       M_list, ME_list, ND=1, function_type='cosh', **kwargs):
 
-        Parameters:
-        b (int): Starting index for data fitting.
-        d (int): Ending index for data fitting.
-        A_list (list): List of initial amplitude guesses.
-        AE_list (list): List of amplitude error guesses.
-        M_list (list): List of initial mass guesses.
-        ME_list (list): List of mass error guesses.
-        data (array-like): Data to fit.
-        ND (int): Parameter for jackknife correlation (default is 1).
-        N (int): A parameter for the prior guess function (default is 1).
-        function_type (str): Type of function to use for fitting ('exp' or 'cosh').
-        set (int): Optional flag for printing results when using 'cosh' function (default is 1).
-
-        Returns:
-        np.array: Fitted values for the entire range of time slices.
-        """
-        
+        ext_data  = kwargs.get("Ext_data", None)
+   
         # Step 1: Perform jackknife correlation on data
-        data = self.jacknifed_correlation(ND, data=data)
+        if ext_data is not None:    
+            data = ext_data
+        else:
+            data = self.jacknifed_correlation(ND, **kwargs)
         
         # Step 2: Create x array and prior information
-        x     = np.arange(b, d)
-        prior = self.make_prior(A_list, AE_list, M_list, ME_list, N)
+        t_range = np.arange(b, d)
+        prior   = self.make_prior(N, A_list, AE_list, M_list, ME_list)
         
         # Step 3: Choose the fitting function based on the function_type
         if function_type == 'exp':
-            fit_function = cls.twopt_exp_function()
+            fit_function = self.twopt_exp_function
         elif function_type == 'cosh':
-            fit_function = cls.twopt_cosh_function()
+            fit_function = self.twopt_cosh_function
         else:
             raise ValueError("Invalid function_type. Choose either 'exp' or 'cosh'.")
         
         # Step 4: Perform the nonlinear fit
-        fit = lsqfit.nonlinear_fit(data=(x, data[b:d]), fcn=fit_function, prior=prior, p0=None, svdcut=1e-15)
+        fit = lsqfit.nonlinear_fit(
+            data=(t_range, data[b:d]),
+            fcn=fit_function,
+            prior=prior,
+            p0=None,
+            svdcut=1e-15
+        )
         
         # Step 5: Return fitted values based on the function type
         if function_type == 'exp':
-            return np.ravel([sum(fit.p['A'] * np.exp(-fit.p['M'] * t)) for t in range(self.TimeSlicing)])
+            return fit
         
         elif function_type == 'cosh':
             NT = self.TimeSlicing // 2
-            if set == 1:
-                print(fit)
-            return np.ravel([sum(2 * fit.p['A'] * np.exp(-fit.p['M'] * NT) * np.cosh(-fit.p['M'] * (t - NT))) for t in range(self.TimeSlicing)])
+            print(fit)
+            return fit
+
+    def fit_build_list(self, N, b, d, 
+                       A_list, AE_list, 
+                       M_list, ME_list, ND=1, function_type='cosh', **kwargs):
+
+        #Debug = kwargs.get('Use_Debug', None)
+        ext_data  = kwargs.get("Ext_data", None)
+
+        # Step 1: Perform jackknife correlation on data
+        if ext_data is not None:    
+            data = ext_data
+        else:
+            data = self.jacknifed_correlation(ND, **kwargs)
+        
+        # Step 2: Create x array and prior information
+        t_range = np.arange(b, d)
+        prior   = self.make_prior(N, A_list, AE_list, M_list, ME_list)
+        
+        # Step 3: Choose the fitting function based on the function_type
+        if function_type == 'exp':
+            fit_function = self.twopt_exp_function
+        elif function_type == 'cosh':
+            fit_function = self.twopt_cosh_function
+        else:
+            raise ValueError("Invalid function_type. Choose either 'exp' or 'cosh'.")
+        
+        # Step 4: Perform the nonlinear fit
+        fit = lsqfit.nonlinear_fit(
+            data=(t_range, data[b:d]),
+            fcn=fit_function,
+            prior=prior,
+            p0=None,
+            svdcut=1e-15
+        )
+        
+        # Step 5: Return fitted values based on the function type
+        if function_type == 'exp':
+            print(fit)
+            return np.ravel([
+                sum(fit.p['A'] * np.exp(-fit.p['M'] * t))
+                for t in range(self.TimeSlicing)
+            ])
+        
+        elif function_type == 'cosh':
+            NT = self.TimeSlicing // 2
+            print(fit)
+            return np.ravel([
+                sum(2 * fit.p['A'] * np.exp(-fit.p['M'] * NT ) * gv.cosh(-fit.p['M'] * (t - NT)))
+                for t in range(self.TimeSlicing)
+                ])
+
+    def plot_compare_fit_raw(self, N, b, d, 
+                             A_list, AE_list, 
+                             M_list, ME_list, ND=1, function_type='cosh', **kwargs):
+        size     = 12
+        T        = self.TimeSlicing
+        t_range  = np.arange(1, T, 1.0)
+
+        data_raw  = self.jacknifed_correlation(ND, **kwargs)
+        y_raw     = gv.mean(data_raw)[1:T]
+        y_err_raw = gv.sdev(data_raw)[1:T]
+
+        data_fit = self.fit_build_list(N, 
+                                      b, d, 
+                                      A_list, AE_list, 
+                                      M_list, ME_list, 
+                                      ND, function_type, **kwargs)
+        y_fit     = gv.mean(data_fit)[1:T]
+        y_err_fit = gv.sdev(data_fit)[1:T]
+        
+        plt.figure(figsize=[10,8])
+        plt.errorbar(
+            t_range, y_raw, yerr=y_err_raw, fmt='o', capsize=5,
+            label='Raw Data', color='blue', ecolor='lightblue', alpha=0.7
+        )
+        plt.errorbar(
+            t_range, y_fit, yerr=y_err_fit, fmt='s', capsize=5,
+            label='Fitted Data', color='red', ecolor='salmon', alpha=0.7
+        )
+        plt.xticks(np.arange(1, T, 2.0), fontsize = size )
+        plt.grid(True, linestyle='--', alpha=0.5)
+        plt.xlabel('T', fontsize = size)
+        plt.ylabel('Data', fontsize = size)
+        if kwargs.get('log', False):
+            plt.yscale('log')
+        plt.tight_layout()
+        plt.show()
 
     def plot_directsum_chebshev(self, T, ND = 1, t0=0.5, title=None, size = 12, **kwargs):
       
@@ -583,7 +639,7 @@ class LatticeFermion:
             debug=debug
         )
 
-        # Print fit results if required
+        # Print fit results if requiredz
         if print_fit:
             print(fit)
             print(fit.format(maxline=True))
@@ -633,7 +689,8 @@ class MockData(LatticeFermion):
         amp       = self.Amplitude
         mas       = self.Mass
         Debug     = kwargs.get('Use_Debug', None)
-        Use_Fit   = kwargs.get('Use_Fit', None)
+        Use_Fit   = kwargs.get('Use_Fit',   None)
+        Use_Refit = kwargs.get('Use_Refit', None)
         SingleExP = self.jacknifed_correlation(amp, mas)
                 
         if Use_Fit == True:
@@ -660,7 +717,7 @@ class MockData(LatticeFermion):
         S     = self.S
         amp   = self.Amplitude
         mas   = self.Mass
-        Rat   = mas / 1.776
+        Rat   = mas / mtau
         Debug = kwargs.get('Use_Debug', None)
 
         if S == 1:
@@ -706,7 +763,7 @@ class MockData(LatticeFermion):
                      gv.sdev(decay_values), 
                      label='mock_decaywidth(t)', 
                      color='b')
-        plt.axhline(y=gv.mean(integral_value), 
+        plt.axhline(y = gv.mean(integral_value), 
                     color='r', 
                     linestyle='--', 
                     label='Exclusive decaywidth')
@@ -724,6 +781,53 @@ class MockData(LatticeFermion):
             plt.show()
         else:
             plt.show()
+
+    @classmethod
+    def mock_decaywidth_multistates(cls, Particle_List, 
+                                    t, t0=0.5, 
+                                    S = None, 
+                                    amp = None, mas = None, **kwargs):
+        '''
+        Use_Fit = True will use Fitting, else use direct sum        
+        '''
+        Debug   = kwargs.get('Use_Debug', None)
+        Use_Fit = kwargs.get('Use_Fit', None)
+        
+        S = []
+        amp = []
+        mas = []
+        SingleExP = []
+        Singlet = []
+        ker = []
+        
+        for particle_list in Particle_List:
+            S[particle_list]         = Particle_List[particle_list].S
+            amp[particle_list]       = Particle_List[particle_list].Amplitude
+            mas[particle_list]       = Particle_List[particle_list].Mass
+            SingleExP[particle_list] = Particle_List[particle_list].jacknifed_correlation(amp, mas)
+                
+            if Use_Fit == True:
+                Singlet[particle_list] = Particle_List[particle_list].directsum_chebshev(t + 1, 
+                                                                          SingleExP[particle_list], 
+                                                                          t0)
+            else:
+                Singlet[particle_list] = Particle_List[particle_list].chebshev_fit_base(t , ND=1, t0=t0)
+        
+            ker    = Particle.kernel_approx(S, SingleExP[particle_list], 
+                                            t0, Use_Debug = Debug, Use_Q0omt = Q0)
+            result = self.cof_in * (0.5 * ker[0] + cp.dot(Singlet, ker[1:t+1]) )
+        
+        print(f"Decay rate of {self.Name} is", result)
+        
+        if Debug == True:
+            #print("Kernel coeffient ", ker)
+            print("prefactor is ", self.cof_in)
+            print("Cof is", Singlet)
+            print("The decay width is ", result)
+            return result
+        else:
+            return result
+
 
 class WilsonFermion(LatticeFermion):
     def __init__(self, **kwargs):
@@ -750,14 +854,32 @@ class RBCQCD(DomainWall):
         super().__init__(**kwargs)
         self.IMP = [1, 2, 3, 4, 51, 52, 53, 54]
         
+    def axial_time(self, ND = 1 , **kwargs):
+        return self.jacknifed_correlation(ND, GammaMatrix = "54", **kwargs)
+    
+    def axial_space(self, **kwargs):
+        
+        s1 = self.jacknifed_correlation(ND, GammaMatrix = "51", **kwargs)
+        s2 = self.jacknifed_correlation(ND, GammaMatrix = "52", **kwargs)
+        s3 = self.jacknifed_correlation(ND, GammaMatrix = "53", **kwargs)
+        return 1/3*(s1+s2+s3)
+    
+    def vector_time(self, **kwargs):
+        return self.jacknifed_correlation(ND, GammaMatrix = "4", **kwargs)
+    
+    def vector_space(self, **kwargs):
+        
+        s1 = self.jacknifed_correlation(ND, GammaMatrix = "1", **kwargs)
+        s2 = self.jacknifed_correlation(ND, GammaMatrix = "2", **kwargs)
+        s3 = self.jacknifed_correlation(ND, GammaMatrix = "3", **kwargs)
+        return 1/3*(s1+s2+s3)
+
     def spectral(self, S, T, t0=0.5, **kwargs):
         # This function computes the spectral result based on the Chebyshev fit and the kernel.
         # S (0 or 1) selects the kernel with related angular momentum.
         Debug       = kwargs.get('Use_Debug', None)
         Use_Fit     = kwargs.get('Use_Fit', None)
-        GammaMatrix = kwargs.get("GammaMatrix", None)
         ext_data    = kwargs.get("Ext_data", None)
-        EO          = kwargs.get("EO", None)
         
         if Use_Fit == True:
             Cheb = self.chebshev_fit_base(T, t0, **kwargs)
@@ -887,7 +1009,6 @@ class RBCQCD(DomainWall):
         else:
             plt.show()
 
-
     def plot_all_GammaMatrix(self, T, t0 = 0.5 ,Num=3, title='None', size = 12, **kwargs):
         EO    = kwargs.get('EO', None)
         Debug = kwargs.get('Use_Debug', None)
@@ -962,8 +1083,8 @@ class BRIDGE(DomainWall):
 
 # --- Define Instances of the Particle Class ---
 # Tau lepton particle with PDG mass, branching ratio, decay constant, and additional parameter
-Tau  = Particle(gv.gvar(1.77686, 0.00018), 1, 1, 1)
-Kaon = Particle(gv.gvar(0.493677, 0.000013), gv.gvar(6.96 * 10 ** (-3), 0.1 * 10 ** (-3)),
+Tau   = Particle(gv.gvar(1.77686, 0.00018), 1, 1, 1)
+Kaon  = Particle(gv.gvar(0.493677, 0.000013), gv.gvar(6.96 * 10 ** (-3), 0.1 * 10 ** (-3)),
                 gv.gvar(0.156, 0.0012), 0.00708743)
 Kstar = Particle(gv.gvar(0.89166, 0.00026), gv.gvar(1.42 * 10 ** (-2), 0.07 * 10 ** (-2)),
                  gv.gvar(0.2228, 0.02), 0.0140239)
@@ -975,13 +1096,12 @@ MockKstar = MockData(Name = 'Kstar', L = 1, S = 1, Mass = Kstar.MassPDG, Amplitu
 MockPion  = MockData(Name = 'Pion' , L = 1, S = 0, Mass = Pion.MassPDG , Amplitude = Pion.DC)
 
 FourEight = RBCQCD(Group='RBCQCD', Name='FourEight', Ncfg = 88, TimeSlicing = 96,L = 48,
-                   Ls=12,s=0.0362,    Inva = Inverse_a48, ZA = ZA_48,
-                  mud=0.00078 ,M5=1.8,PlaquetteAverage=gv.gvar(0.5871119,0.00000025))
+                   Ls = 12 ,s = 0.0362,    Inva = Inverse_a48, ZA = ZA_48,
+                  mud = 0.00078 ,M5 = 1.8,PlaquetteAverage=gv.gvar(0.5871119,0.00000025))
 SixFour   = RBCQCD(Group='RBCQCD', Name='SixFour', Ncfg = 80, TimeSlicing = 128, L = 64, 
-                  Ls = 12, s=0.02661, Inva = Inverse_a64, ZA = ZA_64,
-                  mud=0.000678,M5=1.8,PlaquetteAverage=gv.gvar(0.6153342,0.00000021))
+                  Ls = 12, s = 0.02661, Inva = Inverse_a64, ZA = ZA_64,
+                  mud = 0.000678,M5 = 1.8,PlaquetteAverage=gv.gvar(0.6153342,0.00000021))
 Pegasus   = BRIDGE(Group="Pegasus", Name= "Pegasus", Ncfg = 10, TimeSlicing = 64, L = 32, Ls = 16, M5= 1.8)
-
 
 start = time.time()  # 現在時刻（処理開始前）を取得
 
@@ -996,7 +1116,93 @@ start = time.time()  # 現在時刻（処理開始前）を取得
 #FourEight.vus(T, EO = EO, Use_Fit = Fit , Use_Debug = Debug)
 #SixFour.vus(T, EO = EO, Use_Fit = Fit, Use_Debug = Debug)
 #SixFour.plot_vus(T, EO = EO, Use_Fit = Fit, Use_Debug = Debug, Save_Pic = Save)
-FourEight.plot_vus(T, EO = EO, Use_Fit = Fit, Use_Debug = Debug, Save_Pic = Save)
+#FourEight.plot_vus(T, EO = EO, Use_Fit = Fit, Use_Debug = Debug, Save_Pic = Save)
+#ASixFour_list  = [228, 100]
+#ASixFourE_list = [50, 550]
+#MSixFour_list  = [0.3, 1]
+#MSixFourE_list = [130, 105]
+#SixFour.plot_compare_fit_raw(2, 6 , 24, 
+#SixFour.fit_build_list(2, 6 , 24, 
+#                       ASixFour_list, ASixFourE_list, 
+#                       MSixFour_list, MSixFourE_list, 
+#                       1 , "cosh",
+#                       Use_Debug = Debug, GammaMatrix="54")
+#print(SixFour.axial_space())
+N = 2
+ASixFour_list  = [228, 72, 300]
+ASixFourE_list = [50, 300, 1000]
+MSixFour_list  = [0.3, 0.80, 2]
+MSixFourE_list = [130, 105, 300]
+Fit = SixFour.fit_parameters(N, 6 , 36, 
+                       ASixFour_list[:N], ASixFourE_list[:N], 
+                       MSixFour_list[:N], MSixFourE_list[:N], 
+                       1 , "cosh",
+                       Use_Debug = Debug, log = True,
+                       Ext_data = SixFour.axial_time())
+print(Fit.p['M'] * Inverse_a64)
+print(Fit.p['A'][0],ZA_64 * np.sqrt(2* Fit.p['A'][0] / (Fit.p['M'][0]*64**3)) * Inverse_a64)
+MockKaon_64  = MockData(Name = 'Kaon_64' , L = 1, S = 0, 
+                        Mass = Fit.p['M'][0] * Inverse_a64, 
+                        Amplitude = ZA_64 * np.sqrt(2* Fit.p['A'][0] / (Fit.p['M'][0]*64**3)) * Inverse_a64 )
+MockKaon_64.compare_decaywidths(T, Use_Debug = Debug, Use_Fit = Fit, Save_Pic = Save)
+
+ASixFour_list  = [600, 1500, 300]
+ASixFourE_list = [1000, 300, 100]
+MSixFour_list  = [0.4, 0.80, 2]
+MSixFourE_list = [130, 105, 300]
+Fit = SixFour.fit_parameters(N, 10, 48, 
+                       ASixFour_list[:N], ASixFourE_list[:N], 
+                       MSixFour_list[:N], MSixFourE_list[:N], 
+                       1 , "cosh",
+                       Use_Debug = Debug, log = True, 
+                       Ext_data = SixFour.vector_space())
+print(Fit.p['M'] * Inverse_a64)
+print(Fit.p['A'][0],ZA_64 * np.sqrt(2* Fit.p['A'][0] / (Fit.p['M'][0]*64**3)) * Inverse_a64)
+MockKstar_64  = MockData(Name = 'Kstar_64' , L = 1, S = 1, 
+                        Mass = Fit.p['M'][0] * Inverse_a64, 
+                        Amplitude = ZA_64 * np.sqrt(2* Fit.p['A'][0] / (Fit.p['M'][0]*64**3)) * Inverse_a64 )
+MockKstar_64.compare_decaywidths(T, Use_Debug = Debug, Use_Fit = Fit, Save_Pic = Save)
+
+ASixFour_list  = [250, 72, 300]
+ASixFourE_list = [50, 300, 100]
+MSixFour_list  = [0.3, 0.80, 2]
+MSixFourE_list = [130, 105, 300]
+Fit = FourEight.fit_parameters(N, 6 , 24, 
+                       ASixFour_list[:N], ASixFourE_list[:N], 
+                       MSixFour_list[:N], MSixFourE_list[:N], 
+                       1 , "cosh",
+                       Use_Debug = Debug, log = True, 
+                       Ext_data = FourEight.axial_time())
+print(Fit.p['M'] * Inverse_a48)
+print(Fit.p['A'][0],ZA_48 * np.sqrt(2* Fit.p['A'][0] / (Fit.p['M'][0]*48**3)) * Inverse_a48)
+MockKaon_48  = MockData(Name = 'Kaon_48' , L = 1, S = 0, 
+                        Mass = Fit.p['M'][0] * Inverse_a48, 
+                        Amplitude = ZA_48 * np.sqrt(2* Fit.p['A'][0] / (Fit.p['M'][0]*48**3)) * Inverse_a48 )
+MockKaon_48.compare_decaywidths(T, Use_Debug = Debug, Use_Fit = Fit, Save_Pic = Save)
+
+ASixFour_list  = [900, 1000, 300]
+ASixFourE_list = [50 , 300, 100]
+MSixFour_list  = [0.53, 0.80, 2]
+MSixFourE_list = [0.5, 105, 300]
+Fit = FourEight.fit_parameters(N, 10 , 36, 
+                       ASixFour_list[:N], ASixFourE_list[:N], 
+                       MSixFour_list[:N], MSixFourE_list[:N], 
+                       1 , "cosh",
+                       Use_Debug = Debug, log = True, 
+                       Ext_data = FourEight.vector_space())
+print(Fit.p['M'] * Inverse_a48)
+print(Fit.p['A'][0],ZA_48 * np.sqrt(2* Fit.p['A'][0] / (Fit.p['M'][0]*48**3)) * Inverse_a48)
+MockKstar_48  = MockData(Name = 'Kstar_48' , L = 1, S = 1, 
+                        Mass = Fit.p['M'][0] * Inverse_a48, 
+                        Amplitude = ZA_48 * np.sqrt(2* Fit.p['A'][0] / (Fit.p['M'][0]*48**3)) * Inverse_a48 )
+MockKstar_48.compare_decaywidths(T, Use_Debug = Debug, Use_Fit = Fit, Save_Pic = Save)
+
+#FourEight.plot_compare_fit_raw(N, 6 , 24, 
+#                       ASixFour_list[:N], ASixFourE_list[:N], 
+#                       MSixFour_list[:N], MSixFourE_list[:N], 
+#                       1 , "cosh",
+#                       Use_Debug = Debug, GammaMatrix="54", log = True)
+#MockKaon_48  = MockData(Name = 'Kaon' , L = 1, S = 0, Mass = Kaon.MassPDG , Amplitude = Kaon.DC)
 
 #MockKstar.mock_decaywidth(T, Use_Debug = Debug, Use_Fit = Fit)
 #MockKstar.mock_decaywidth_by_integral(Use_Debug = Debug)
