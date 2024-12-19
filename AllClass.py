@@ -144,7 +144,8 @@ class LatticeFermion:
         self.vusin  = VUSPDGIN
         self.vpi    = 1
         self.cof_ex = Prefactor * SEW * VUSPDGEX ** 2 / totaldecaywidth 
-        self.cof_in = Prefactor * SEW * VUSPDGIN ** 2 / totaldecaywidth 
+        self.cof_in = Prefactor * SEW * VUSPDGIN ** 2 / totaldecaywidth       
+        self.cof_in = Prefactor * SEW / totaldecaywidth
         
     def twopt_cosh_function(self,t,p):
         a = p['A']  # array of a[i]s
@@ -669,6 +670,7 @@ class MockData(LatticeFermion):
         for attr in attributes:
             setattr(self, attr, kwargs.get(attr, None))
             super().__init__(**kwargs)
+                
 
     def jacknifed_correlation(self, amp = None, mas = None):
         '''a for decay constant and b for mass.'''
@@ -690,7 +692,6 @@ class MockData(LatticeFermion):
         mas       = self.Mass
         Debug     = kwargs.get('Use_Debug', None)
         Use_Fit   = kwargs.get('Use_Fit',   None)
-        Use_Refit = kwargs.get('Use_Refit', None)
         SingleExP = self.jacknifed_correlation(amp, mas)
                 
         if Use_Fit == True:
@@ -703,15 +704,16 @@ class MockData(LatticeFermion):
         
         print(f"Decay rate of {self.Name} is", result)
         
-        if Debug == True:
+        #if Debug == True:
             #print("Kernel coeffient ", ker)
-            print("prefactor is ", self.cof_in)
-            print("Cof is", Singlet)
-            print("The decay width is ", result)
-            return result
-        else:
-            return result
-      
+        #    print("prefactor is ", self.cof_in)
+        #    print("Cof is", Singlet)
+        #    print("The decay width is ", result)
+        #    return result
+        #else:
+        #    return result
+        return result
+
     def mock_decaywidth_by_integral(self, S = None, amp  = None, mas = None, **kwargs):
         
         S     = self.S
@@ -738,16 +740,28 @@ class MockData(LatticeFermion):
         Save      = kwargs.get('Save_Pic', None)
         Debug     = kwargs.get('Use_Debug', None)
         Use_Fit   = kwargs.get('Use_Fit', None)
+        ZA        = kwargs.get('ZA', None)
+        Ina       = kwargs.get('Ina', None)
         t_values  = np.arange(0, T)
         size      = 24
         tick_size = 16
         
+        if ZA == True:
+            ZA = ZA
+        else:
+            ZA = 1
+            
+        if Ina == True:
+            Ina = Ina
+        else:
+            Ina = 1
+            
         integral_value = self.mock_decaywidth_by_integral(**kwargs)
-        
+
         decay_values = []
         for t in t_values:
             try:
-                decay_value = self.mock_decaywidth(t, t0=t0, Use_Fit = Use_Fit , Use_Debug = Debug)
+                decay_value = self.mock_decaywidth(t, t0=t0 , Use_Fit = Use_Fit , Use_Debug = Debug)
                 decay_values.append(decay_value)
             except ValueError as e:
                 if Debug == True:
@@ -763,7 +777,7 @@ class MockData(LatticeFermion):
                      gv.sdev(decay_values), 
                      label='mock_decaywidth(t)', 
                      color='b')
-        plt.axhline(y = gv.mean(integral_value), 
+        plt.axhline(y = gv.mean(integral_value),
                     color='r', 
                     linestyle='--', 
                     label='Exclusive decaywidth')
@@ -781,6 +795,63 @@ class MockData(LatticeFermion):
             plt.show()
         else:
             plt.show()
+
+    def compare_vus(self, T, t0=0.5, **kwargs):
+        
+        Save      = kwargs.get('Save_Pic', None)
+        Debug     = kwargs.get('Use_Debug', None)
+        Use_Fit   = kwargs.get('Use_Fit', None)
+        t_values  = np.arange(0, T)
+        size      = 24
+        tick_size = 16
+        
+        decay_values = []
+        for t in t_values:
+            try:
+                decay_value = self.mock_decaywidth(t, t0=t0, Use_Fit = Use_Fit, Use_Debug = Debug)
+                if self.S == 0: 
+                    vus = np.sqrt((decay_value/(PDGKaon))** (-1))
+                elif self.S == 1:
+                    vus = np.sqrt((decay_value/(PDGKstar))** (-1))
+                decay_values.append(vus)
+                
+            except ValueError as e:
+                if Debug == True:
+                    print(f"Error calculating decay width at t={t}: {e}")
+                    print(f"Length of t_values: {len(t_values)}")
+                    print(f"Length of decay_values: {len(decay_values)}")
+                else:
+                    decay_values.append(np.nan)
+
+        plt.figure(figsize=(10, 6))
+        plt.errorbar(t_values, 
+                     gv.mean(decay_values),
+                     gv.sdev(decay_values), 
+                     label='mock_Vus(t)', 
+                     color='b')
+        plt.axhline(y = gv.mean(VUSPDGEX),
+                    color='r', 
+                    linestyle='--', 
+                    label='Vus_exp')
+        plt.fill_between(x=t_values, 
+                         y1=gv.mean(VUSPDGEX)-gv.sdev(VUSPDGEX), 
+                         y2=gv.mean(VUSPDGEX)+gv.sdev(VUSPDGEX), 
+                         color='r', alpha=0.2)
+
+        plt.title(f'Comparison of Vus for {self.Name}', fontsize = size)
+        plt.xlabel('N', fontsize = size)
+        plt.ylabel('Vus', fontsize = size)
+        plt.legend(fontsize = size // 1.5)
+        plt.grid(True)
+        plt.xticks(t_values, fontsize=tick_size) 
+        plt.yticks(fontsize=tick_size)
+        plt.tight_layout()
+        if Save == True:
+            plt.savefig(f'Figs/Vus_mock{self.Name}Grid.png')
+            plt.show()
+        else:
+            plt.show()
+
 
     @classmethod
     def mock_decaywidth_multistates(cls, Particle_List, 
@@ -1128,6 +1199,9 @@ start = time.time()  # 現在時刻（処理開始前）を取得
 #                       1 , "cosh",
 #                       Use_Debug = Debug, GammaMatrix="54")
 #print(SixFour.axial_space())
+
+PDGKstar
+
 N = 2
 ASixFour_list  = [228, 72, 300]
 ASixFourE_list = [50, 300, 1000]
@@ -1144,7 +1218,7 @@ print(Fit.p['A'][0],ZA_64 * np.sqrt(2* Fit.p['A'][0] / (Fit.p['M'][0]*64**3)) * 
 MockKaon_64  = MockData(Name = 'Kaon_64' , L = 1, S = 0, 
                         Mass = Fit.p['M'][0] * Inverse_a64, 
                         Amplitude = ZA_64 * np.sqrt(2* Fit.p['A'][0] / (Fit.p['M'][0]*64**3)) * Inverse_a64 )
-MockKaon_64.compare_decaywidths(T, Use_Debug = Debug, Use_Fit = Fit, Save_Pic = Save)
+MockKaon_64.compare_vus(T, Use_Debug = Debug, Use_Fit = Fit, Save_Pic = Save, S = MockKaon_64.S)
 
 ASixFour_list  = [600, 1500, 300]
 ASixFourE_list = [1000, 300, 100]
@@ -1161,7 +1235,8 @@ print(Fit.p['A'][0],ZA_64 * np.sqrt(2* Fit.p['A'][0] / (Fit.p['M'][0]*64**3)) * 
 MockKstar_64  = MockData(Name = 'Kstar_64' , L = 1, S = 1, 
                         Mass = Fit.p['M'][0] * Inverse_a64, 
                         Amplitude = ZA_64 * np.sqrt(2* Fit.p['A'][0] / (Fit.p['M'][0]*64**3)) * Inverse_a64 )
-MockKstar_64.compare_decaywidths(T, Use_Debug = Debug, Use_Fit = Fit, Save_Pic = Save)
+#MockKstar_64.compare_decaywidths(T, Use_Debug = Debug, Use_Fit = Fit, Save_Pic = Save)
+MockKstar_64.compare_vus(T, Use_Debug = Debug, Use_Fit = Fit, Save_Pic = Save, S = 1)
 
 ASixFour_list  = [250, 72, 300]
 ASixFourE_list = [50, 300, 100]
@@ -1178,7 +1253,8 @@ print(Fit.p['A'][0],ZA_48 * np.sqrt(2* Fit.p['A'][0] / (Fit.p['M'][0]*48**3)) * 
 MockKaon_48  = MockData(Name = 'Kaon_48' , L = 1, S = 0, 
                         Mass = Fit.p['M'][0] * Inverse_a48, 
                         Amplitude = ZA_48 * np.sqrt(2* Fit.p['A'][0] / (Fit.p['M'][0]*48**3)) * Inverse_a48 )
-MockKaon_48.compare_decaywidths(T, Use_Debug = Debug, Use_Fit = Fit, Save_Pic = Save)
+#MockKaon_48.compare_decaywidths(T, Use_Debug = Debug, Use_Fit = Fit, Save_Pic = Save)
+MockKaon_48.compare_vus(T, Use_Debug = Debug, Use_Fit = Fit, Save_Pic = Save, S = MockKaon_48.S)
 
 ASixFour_list  = [900, 1000, 300]
 ASixFourE_list = [50 , 300, 100]
@@ -1195,7 +1271,8 @@ print(Fit.p['A'][0],ZA_48 * np.sqrt(2* Fit.p['A'][0] / (Fit.p['M'][0]*48**3)) * 
 MockKstar_48  = MockData(Name = 'Kstar_48' , L = 1, S = 1, 
                         Mass = Fit.p['M'][0] * Inverse_a48, 
                         Amplitude = ZA_48 * np.sqrt(2* Fit.p['A'][0] / (Fit.p['M'][0]*48**3)) * Inverse_a48 )
-MockKstar_48.compare_decaywidths(T, Use_Debug = Debug, Use_Fit = Fit, Save_Pic = Save)
+#MockKstar_48.compare_decaywidths(T, Use_Debug = Debug, Use_Fit = Fit, Save_Pic = Save)
+MockKstar_48.compare_vus(T, Use_Debug = Debug, Use_Fit = Fit, Save_Pic = Save, S = 1)
 
 #FourEight.plot_compare_fit_raw(N, 6 , 24, 
 #                       ASixFour_list[:N], ASixFourE_list[:N], 
