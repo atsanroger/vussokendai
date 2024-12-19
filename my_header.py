@@ -3,7 +3,7 @@
 ##        @brief
 ##        @author  Wei-Lun Chen (wlchen)
 ##                 $LastChangedBy: wlchen $
-##        @date    $LastChangedDate: 2024-10-17 16:42:21 #$
+##        @date    $LastChangedDate: 2024-12-19 16:42:21 #$
 ##        @version $LastChangedRevision: 2499 $
 ##
 
@@ -76,9 +76,9 @@ Total = 2 * 10 ** (-12) / gv.gvar(0.01779, 0.00009)
 # Prefactor connecting Gapp to decay width (崩壊幅に接続する前置係数)
 Prefactor = GF ** 2 * mtau ** 3 / (16 * np.pi)
 
-# Decay probabilities for specific channels (特定チャネルの崩壊確率)
 PDGKaon  = 0.00708743  # Kaon channel
-PDGKstar = 0.0140239   # K* channel
+#PDGKstar = 0.0140239   # K* channel
+PDGKstar = gv.gvar(0.012839, 0.0027)    # K* channel
 PDGPion  = 0.113876    # Pion channel
 
 # Lattice Parameters
@@ -90,8 +90,8 @@ Mass_kaon_64  = gv.gvar(0.21531,0.00017)
 Leng_48= gv.gvar(5.468,0.012) #unit fm
 Leng_64= gv.gvar(5.349,0.016) #unit fm
 
-ZA_48=0.71076
-ZA_64=0.74293
-
-fk_48=gv.gvar(0.090396,0.000086)
-fk_64=gv.gvar(0.066534,0.000099)
+ZA_48 = 0.71076
+ZA_64 = 0.74293
+	
+fk_48 = gv.gvar(0.090396,0.000086)
+fk_64 = gv.gvar(0.066534,0.000099)
