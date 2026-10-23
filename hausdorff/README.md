@@ -12,3 +12,4 @@ Positivity test for the [-1, 1] support hypothesis (Möbius/DWF with M5 > 1) on 
 - `RESULTS_SAFE_VUS.md` certified bounds on the inclusive rate (safe_vus.py, vus_interval.py) and old-vs-new comparison
 
 The data are not in this repository.
+- `paper/hausdorff_vus.pdf` the method written out line by line (source `paper/hausdorff_vus.tex`, figures by `paper/make_figs.py`)

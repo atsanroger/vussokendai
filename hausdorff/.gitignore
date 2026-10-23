@@ -1,2 +1,7 @@
 __pycache__/
 *.npy
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.toc
+paper/figs/.bounds_cache.pkl

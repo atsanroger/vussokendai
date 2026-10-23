@@ -28,4 +28,3 @@ for ens in ("48", "64"):
                 res[(ens, ch, T, sup)] = (zs[-1], bs[-1])
             f = lambda b: ("   infeasible            " if np.isnan(b[0]) else f"[{b[0]:.5f}, {b[1]:.5f}]")
             print(f"{line}    {zs[0]:7.2f}        {zs[1]:7.2f}     | {f(bs[0])}  | {f(bs[1])}")
-import pickle; pickle.dump(res, open("/tmp/claude-1000/-home-wlchen/f6a64efb-47f9-46cf-a3f9-acdc735ea3fb/scratchpad/bounds_res.pkl", "wb"))

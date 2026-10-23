@@ -120,6 +120,54 @@ def bounds(C, sig, lam, T, z, kappa):
     return lo.fun, -hi.fun
 
 
+def certified_bounds(C, sig, lam, T, z, kappa_fn, ndense=200000):
+    """Rigorous version of bounds().  The LP duals give a polynomial p(lambda) = sum_k p_k lambda^k, p_k = (y+_k - y-_k)/sigma_k,
+    with  p >= g  on the grid (g = kappa/lambda for lambda > 0, 0 for lambda < 0).  If p >= g on the whole continuous
+    support, then for every positive measure sigma whose moments m_k = int lambda^k dsigma lie in the boxes
+        int g dsigma <= int p dsigma = sum_k p_k m_k <= sum_k p_k C(k+1) + z sum_k |p_k| sigma_{k+1}.
+    p is checked on a dense grid of the support and lifted by the largest violation delta (p_0 += delta).
+    The lower bound uses the mirror image (q <= g).  kappa_fn(E) returns kappa for lattice energy E.
+    Returns dict(lo_cert, hi_cert, lo_grid, hi_grid, delta_lo, delta_hi)."""
+    c1 = C[1]
+    g = np.zeros_like(lam); pos = lam > 0
+    g[pos] = kappa_fn(-np.log(lam[pos])) / lam[pos]
+    M = moment_matrix(lam, T) * c1
+    sg = sig[1:T + 1]
+    A = np.vstack([M / sg[:, None], -M / sg[:, None]])
+    b = np.r_[(C[1:T + 1] + z * sg) / sg, -(C[1:T + 1] - z * sg) / sg]
+    bnd = [(0, None)] * len(lam)
+    lp = lam[pos]
+    parts = [np.linspace(lp.min(), lp.max(), ndense), [0.0]]
+    if lam.min() < 0:
+        parts.append(np.linspace(-1.0, -1e-6, ndense // 4))
+    lamd = np.concatenate(parts)
+    gd = np.zeros_like(lamd)
+    pd = lamd > 0
+    gd[pd] = kappa_fn(-np.log(lamd[pd])) / lamd[pd]
+    res = {}
+    for name, sign in (("hi", 1.0), ("lo", -1.0)):
+        r = _solve(-sign * g * c1, A, b, bnd)           # hi: min -g.u ; lo: min +g.u
+        if r.status != 0:
+            return None
+        y = -r.ineqlin.marginals                         # >= 0, one per constraint row
+        pk = (y[:T] - y[T:]) / sg
+        if sign > 0:
+            poly = pk.copy()
+            delta = max(0.0, float(np.max(gd - np.polyval(poly[::-1], lamd))))
+            poly[0] += delta
+            res["hi_cert"] = float(np.dot(poly, C[1:T + 1]) + z * np.dot(np.abs(poly), sg))
+            res["hi_grid"] = -r.fun
+            res["delta_hi"] = delta
+        else:
+            poly = -pk
+            delta = max(0.0, float(np.max(np.polyval(poly[::-1], lamd) - gd)))
+            poly[0] -= delta
+            res["lo_cert"] = float(np.dot(poly, C[1:T + 1]) - z * np.dot(np.abs(poly), sg))
+            res["lo_grid"] = r.fun
+            res["delta_lo"] = delta
+    return res
+
+
 def cheb_coeffs(n, shifted):
     """Monomial coefficients of T_n (or shifted T*_n = T_n(2x-1)) on [-1,1] ([0,1])."""
     t = np.polynomial.chebyshev.cheb2poly([0] * n + [1])
