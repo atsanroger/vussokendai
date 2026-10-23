@@ -16,8 +16,14 @@ check by the author before |Vus| is trusted. "Old version" may already have fixe
 1. **Kernel assignment in `RBCQCD.vus`.** `Axial_T` and `Axial_S` use `spectral(1, ...)` (J=1 kernel),
    `Vector_T` and `Vector_S` use `spectral(0, ...)` (J=0 kernel). At zero spatial momentum the
    temporal components (A_0, V_0) carry J=0 and the spatial ones (A_i, V_i) carry J=1, so the
-   kernels would be expected by time/space, not by vector/axial: A_T -> J=0, V_S -> J=1.
-   As written two of the four terms look swapped.
+   expected assignment is by time/space: A_T -> J=0, V_S -> J=1.
+   The module-level mock code of the same file already uses that assignment (kaon, which sits in
+   A_T, with `S = 0`; K*, which sits in V_S, with `S = 1`), so `vus()` disagrees with the rest of the file.
+   Run with the original code (patched only for cupy, `old_code_check/`), 48I and 64I, Q0 = 0.05, `--Fit`:
+   the two assignments differ by 5-10% in Vus at the same T, e.g. 64I T=6: 0.211 (as written) vs 0.188
+   (time/space); 48I T=6: 0.300 vs 0.269.
+   **Neither assignment converges with T** (values jump up and down between T=2 and T=8), and the
+   quoted error (about 0.0006) does not include the truncation error, so no Vus can be read from it.
 2. **`--t0` is ignored in `vus`.** `spectral` calls `self.directsum_chebshev(T, t0, **kwargs)`, but the
    signature is `(self, T, ND=1, t0=0.5, ...)`, so `t0` lands in `ND` and the real t0 stays 0.5.
    The same slip is in the `chebshev_fit_base(T, t0, ...)` call.
