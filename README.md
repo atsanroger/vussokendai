@@ -1,3 +1,20 @@
+# inclusive
+
+Inclusive tau -> X_s nu: the original Chebyshev code (`AllClass.py`, `args.py`, `my_header.py`, `TauDecay.pdf`, from
+`vussokendai`) merged on 2026-10-23 with the notes and the new certified-bounds work.
+
+| path | what |
+|---|---|
+| `AllClass.py`, `args.py`, `my_header.py`, `TauDecay.pdf` | the original code and write-up (unchanged) |
+| `hausdorff/` | Hausdorff positivity scan, certified bounds, old-vs-new comparison, `paper/hausdorff_vus.pdf` |
+| `notes/` | the 2026-10-21 literature notes (`REPORT*.md`) |
+| `RBCQCD` | symlink to the correlator data (`../BetterData/RBCQCD`, not in git); run the scripts from this directory |
+
+Quick start (from this directory): `python hausdorff/hankel_scan.py`, `python hausdorff/vus_certified.py`.
+The data are not in the repository.
+
+---
+
 
 # The inclusive decay calculation 
 
