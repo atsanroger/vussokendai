@@ -1,13 +1,13 @@
-"""Certified interval for |Vus| = sqrt( B_s Gamma_tau / (Pref S_EW Sigma_tot) ),  Sigma_tot = sum of the four channel sums.
+"""Interval for |Vus| = sqrt( B_s Gamma_tau / (Pref S_EW Sigma_tot) ),  Sigma_tot = sum of the four channel sums.
 Bounds of independent channels add (each channel has its own measure), which is conservative.
-B_s is a PLACEHOLDER (see safe_vus.BS_PLACEHOLDER) and must be replaced by the experimental value."""
+B_s = 0.02908(48) from HFLAV 2023 (see safe_vus.BS); override with BS=... and BS_ERR=..."""
 import os, sys, numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import safe_vus as S
 D = os.path.join(os.getcwd(), "RBCQCD")
-Bs = float(os.environ.get("BS", S.BS_PLACEHOLDER))
+Bs = float(os.environ.get("BS", S.BS)); BsE = float(os.environ.get("BS_ERR", S.BS_ERR))
 c = Bs * S.GAMMA_TAU / (S.PREF * S.SEW)
-print(f"B_s = {Bs} (placeholder unless set via BS=...),  c = B_s Gamma_tau/(Pref SEW) = {c:.4e} GeV^2")
+print(f"B_s = {Bs} +- {BsE},  c = B_s Gamma_tau/(Pref SEW) = {c:.4e} GeV^2")
 print(f"expected Sigma_tot for Vus=0.2243: {c/0.2243**2:.4f} GeV^2\n")
 out = {}
 for ens in ("48", "64"):

@@ -79,7 +79,7 @@ fig.text(0.5, 0.005, r"48I, $z=3$.  Bounds on $\Sigma=\int d\sigma\,\kappa_J/\la
 fig.tight_layout(rect=(0, 0.02, 1, 0.94)); fig.savefig(os.path.join(OUT, "fig_bounds.pdf")); plt.close(fig)
 
 # ---------- Figure 3: |Vus|
-c = S.BS_PLACEHOLDER * S.GAMMA_TAU / (S.PREF * S.SEW)
+c = S.BS * S.GAMMA_TAU / (S.PREF * S.SEW)
 old_code = {"48": {"orig": [0.5353, 0.18812, 0.27506, 0.27590, 0.2999, 0.2575, 0.342],
                    "phys": [0.3717, 0.17497, 0.24573, 0.25168, 0.26853, 0.2423, 0.316]},
             "64": {"orig": [0.29142, 0.129816, 0.17663, 0.18668, 0.21144, 0.17006, 0.2527],
@@ -99,6 +99,6 @@ axs[0].set_ylabel(r"$|V_{us}|$")
 h, l = axs[0].get_legend_handles_labels()
 fig.legend(h, l, loc="upper center", ncol=3, fontsize=7.4, bbox_to_anchor=(0.5, 1.0))
 axs[1].annotate(r"PDG $0.2243$", xy=(22, 0.2243), xytext=(0, -9), textcoords="offset points", ha="right", fontsize=7.5, color=MUTED)
-fig.text(0.5, 0.005, r"$B_s=0.0293$ is a placeholder; $|V_{us}|\propto\sqrt{B_s}$. New interval: $z=3$.", ha="center", fontsize=7.5, color=MUTED)
+fig.text(0.5, 0.005, r"$B_s=0.02908$ (HFLAV 2023); $|V_{us}|\propto\sqrt{B_s}$. New interval: $z=3$.", ha="center", fontsize=7.5, color=MUTED)
 fig.tight_layout(rect=(0, 0.03, 1, 0.9)); fig.savefig(os.path.join(OUT, "fig_vus.pdf")); plt.close(fig)
 print("figures written to", OUT)

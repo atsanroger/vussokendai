@@ -32,7 +32,10 @@ GF = 1.1663787e-5       # GeV^-2
 SEW = 1.0201
 GAMMA_TAU = 2.2670e-12  # GeV, hbar / tau lifetime
 PREF = GF ** 2 * MTAU ** 3 / (16 * np.pi)
-BS_PLACEHOLDER = 0.0293  # NOT verified: HFLAV inclusive strange BR is about 2.9%; the user must supply the value
+# Inclusive strange branching fraction B_us = 2.908 +- 0.048 %  (HFLAV 2023, arXiv:2411.18639, Sec. 11.6.1, eq. 246;
+# table value B(tau -> X_s nu) = 0.0291(5), unitarity-constrained 0.0292(4)).
+BS = 0.02908
+BS_ERR = 0.00048
 
 PHYS = {
     "48": dict(Ina=1.7295, Z=0.71076, M0=0.28816, L=48),
