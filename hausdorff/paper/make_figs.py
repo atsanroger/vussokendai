@@ -102,3 +102,44 @@ axs[1].annotate(r"PDG $0.2243$", xy=(22, 0.2243), xytext=(0, -9), textcoords="of
 fig.text(0.5, 0.005, r"$B_s=0.02908$ (HFLAV 2023); $|V_{us}|\propto\sqrt{B_s}$. New interval: $z=3$.", ha="center", fontsize=7.5, color=MUTED)
 fig.tight_layout(rect=(0, 0.03, 1, 0.9)); fig.savefig(os.path.join(OUT, "fig_vus.pdf")); plt.close(fig)
 print("figures written to", OUT)
+
+# ---------- Figure 4: the certificate polynomials and the extremal measures (48I, T=18, z=3)
+ens, T, Z = "48", 18, 3.0
+ph = S.PHYS[ens]; f2 = ph["Ina"] ** 2
+lam = S.make_grid(ph["M0"], "pm1"); pos = lam > 0
+lam_d = np.linspace(-1.0, np.exp(-ph["M0"]), 4000)
+fig, axs = plt.subplots(2, 2, figsize=(7.2, 5.6))
+for row, ch in zip(axs, ("AT", "AS")):
+    gam, J = S.CHANNELS[ch]
+    C = S.load_channel(ens, gam, D); mean, err, _ = S.jk_stats(C, T + 1)
+    g = np.zeros_like(lam); g[pos] = S.kernel_lat(-np.log(lam[pos]), J, ph["Ina"]) / lam[pos]
+    gd = np.zeros_like(lam_d); pd_ = lam_d > 0; gd[pd_] = S.kernel_lat(-np.log(lam_d[pd_]), J, ph["Ina"]) / lam_d[pd_]
+    M = S.moment_matrix(lam, T) * mean[1]; sg = err[1:T + 1]
+    A = np.vstack([M / sg[:, None], -M / sg[:, None]])
+    b = np.r_[(mean[1:T + 1] + Z * sg) / sg, -(mean[1:T + 1] - Z * sg) / sg]
+    ax, axm = row
+    ax.plot(lam_d, gd, color=INK, lw=1.8, label=r"$g(\lambda)$")
+    for sign, col, ls, nm in ((1.0, NEW, "-", r"$p\geq g$ (upper)"), (-1.0, OLD, "--", r"$q\leq g$ (lower)")):
+        r = S._solve(-sign * g * mean[1], A, b, [(0, None)] * len(lam))
+        y = -r.ineqlin.marginals; pk = sign * (y[:T] - y[T:]) / sg
+        ax.plot(lam_d, np.polyval(pk[::-1], lam_d), color=col, lw=1.3, ls=ls, label=nm)
+        w = r.x * mean[1] / mean[1]                   # weights relative to m_0 = C(1)
+        keep = w > 1e-4
+        axm.vlines(lam[keep] + (0.006 if sign < 0 else -0.006), 0, w[keep], color=col, lw=2.2)
+        axm.plot(lam[keep] + (0.006 if sign < 0 else -0.006), w[keep], "o" if sign > 0 else "s", color=col, ms=3.5,
+                 label="maximising measure" if sign > 0 else "minimising measure")
+    top = gd.max()
+    ax.set_ylim(-0.25 * top, 1.35 * top); ax.set_xlim(-1, 0.8)
+    for a_ in (ax, axm):
+        a_.axvline(np.exp(-S.MTAU / ph["Ina"]), color=MUTED, lw=0.8, ls=":")
+        a_.axvline(0, color=MUTED, lw=0.6)
+    ax.annotate(r"$E=m_\tau$", xy=(np.exp(-S.MTAU / ph["Ina"]), 1.25 * top), xytext=(3, 0), textcoords="offset points", fontsize=7.5, color=MUTED)
+    ax.annotate(r"$\lambda<0$: $g=0$", xy=(-0.95, 0.08 * top), fontsize=7.5, color=MUTED)
+    ax.set_title(TITLE[ch] + r": certificates", fontsize=9, loc="left"); ax.set_xlabel(r"$\lambda$")
+    axm.set_yscale("log"); axm.set_ylim(1e-4, 1.5); axm.set_xlim(-1, 0.8)
+    axm.set_title(TITLE[ch] + r": extremal $\sigma$, weight $/\,C(1)$", fontsize=9, loc="left"); axm.set_xlabel(r"$\lambda$")
+axs[0, 0].legend(fontsize=7.5, loc="upper left"); axs[0, 1].legend(fontsize=7.5, loc="upper left")
+fig.text(0.5, 0.005, r"48I, $T=18$, $z=3$.  Left: $p$ and $q$ from the LP duals; they touch $g$ where the extremal measures put weight.  Dotted: kernel edge.",
+         ha="center", fontsize=7.5, color=MUTED)
+fig.tight_layout(rect=(0, 0.02, 1, 1)); fig.savefig(os.path.join(OUT, "fig_cert.pdf")); plt.close(fig)
+print("fig_cert written")

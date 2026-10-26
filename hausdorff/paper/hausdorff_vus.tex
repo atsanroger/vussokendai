@@ -26,24 +26,23 @@
 \setlength{\parskip}{0.4em}
 
 \title{Certified bounds on the inclusive $\tau\to X_s\nu_\tau$ rate\\ from lattice correlators with a Hausdorff moment condition on $[-1,1]$}
-\author{Draft for Wei-Lun Chen\\[0.2em]
-{\small Derivations and numerics prepared with Claude (Anthropic); every step is meant to be checked by the author.}}
-\date{23 October 2026}
+\author{Wei-Lun Chen\\[0.2em]
+{\small Working draft. Derivations and numerics were prepared with Claude (Anthropic)}\\{\small and are to be checked line by line.}}
+\date{26 October 2026}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-The Chebyshev method for inclusive $\tau$ decays assumes that the lattice correlator is a positive
-combination of $\lambda^t$ with $\lambda=\ee^{-E}\in(0,1]$. For domain-wall fermions with $M_5>1$ the
-transfer matrix has negative eigenvalues, and the assumption is not guaranteed.
-I show, line by line, how the rate is written as a linear functional of a positive measure,
-why the old Chebyshev coefficients leave $[-1,1]$, and how a moment problem on $[-1,1]$ gives
-\emph{certified} upper and lower bounds on the kernel integral from the RBC/UKQCD $48^3\times96$
-and $64^3\times128$ $\bar u s$ correlators.
-On these data the support $(0,1]$ is excluded at $3\sigma$ in the $J=0$ (time-component) channels,
-while $[-1,1]$ is compatible. With the HFLAV value $\BR_s=0.02908(48)$ the resulting interval is $0.198\lesssim\Vus\lesssim0.249$ ($0.196$--$0.251$ with the $\BR_s$ error added);
-it is a guarantee under the stated assumptions, not a precision determination.
+Extracting $\Vus$ from the inclusive decay $\tau\to X_s\nu_\tau$ requires an integral of the $\bar us$ spectral function against a known kinematic kernel.
+The lattice provides only the Euclidean correlator, and inverting it is ill-posed. The Chebyshev method addresses this by assuming that the correlator is a positive
+combination of $\lambda^t$ with $\lambda=\ee^{-E}\in(0,1]$. For domain-wall fermions with $M_5>1$ the transfer matrix has negative eigenvalues, so this assumption
+can fail. We find that it does fail on RBC/UKQCD data: the time-component ($J=0$) correlators cannot be reproduced by a positive measure on $(0,1]$ within $3\sigma$.
+They can be reproduced by a positive measure on $[-1,1]$.
+We then replace the truncated Chebyshev expansion by a different question: over all positive measures on $[-1,1]$ that reproduce the data, how large and how small
+can the kernel integral be? This is a linear program. Its dual is a polynomial that lies above (below) the kernel, and that polynomial certifies the bound independently of the solver.
+On the $48^3\times96$ and $64^3\times128$ ensembles, with the HFLAV value $\BR_s=0.02908(48)$, we obtain $0.198\le\Vus\le0.249$ ($0.196$--$0.251$ including the $\BR_s$ error).
+This interval is a guarantee under stated assumptions, not a precision determination.
 \end{abstract}
 
 \setcounter{tocdepth}{1}
@@ -51,196 +50,324 @@ it is a guarantee under the stated assumptions, not a precision determination.
 
 %--------------------------------------------------------------------
 \section{Introduction}
-The inclusive hadronic width $\Gamma(\tau\to X_s\nu_\tau)$ gives $\Vus$ once the spectral function of the
-$\bar u s$ currents is known. On the lattice only the Euclidean correlator $C(t)$ is available. The method of
-Refs.~\cite{Hashimoto:2017,Bailas:2020,Gambino:2020} expands the kernel in shifted Chebyshev polynomials $T^*_n(\lambda)$ of
-$\lambda=\ee^{-\hat H}$ and uses $|\langle T^*_n\rangle|\le1$, which holds for a positive measure on $[0,1]$.
+The inclusive width $\Gamma(\tau\to X_s\nu_\tau)$ is proportional to $\Vus^2$ times an integral of the $\bar us$ spectral function $\rho(Q^2)$ against a kernel fixed by kinematics.
+If $\rho$ were known, $\Vus$ would follow from the measured branching fraction. On the lattice we have the Euclidean correlator $C(t)$, which is the Laplace transform of $\rho$, and
+recovering an integral of $\rho$ from noisy values of $C(t)$ is an ill-posed inverse problem.
 
-Three observations motivate this note.
-\begin{enumerate}[leftmargin=*,itemsep=0pt]
-\item With M\"obius domain-wall fermions at $M_5=1.8$ the one-step transfer matrix has real negative eigenvalues
-      \cite{Syritsyn:2007}; a positive measure on $[0,1]$ is then not guaranteed.
-\item In the old direct-sum implementation the coefficients $\langle T^*_n\rangle$ leave $[-1,1]$ at $n\simeq5$--$8$
-      (Sec.~\ref{sec:cheb}), and the resulting $\Vus$ does not converge with the number of terms.
-\item The kernel is singular at $E\to0$ and is cut off by a regulator without physical meaning; a lower edge $E\ge M_K$ is
-      physical and removes the need for it.
+The approach of Refs.~\cite{Hashimoto:2017,Bailas:2020,Gambino:2020} avoids an explicit inversion. One writes $C(t)$ as the expectation of $\lambda^t$, $\lambda=\ee^{-\hat H}$, expands the kernel in
+shifted Chebyshev polynomials $T^*_n(\lambda)$, and determines the expectations $\langle T^*_n\rangle$ from the data. The key input is that $\lambda^t$ is averaged over a \emph{positive measure
+on $[0,1]$}. That input implies $|\langle T^*_n\rangle|\le1$, which keeps the expansion under control.
+
+Applying this method to the RBC/UKQCD $\bar us$ correlators, we ran into three problems:
+\begin{enumerate}[leftmargin=*,itemsep=1pt]
+\item The ensembles use M\"obius domain-wall fermions with $M_5=1.8$. For $M_5>1$ the one-step transfer matrix has real \emph{negative} eigenvalues \cite{Syritsyn:2007}.
+      A positive measure on $[0,1]$ is then not guaranteed.
+\item In the original implementation the fitted $\langle T^*_n\rangle$ leave $[-1,1]$ already at $n\simeq5$--$8$ (Sec.~\ref{sec:cheb}). The resulting $\Vus$ changes by tens of percent from one truncation order to the next.
+\item The kernel diverges like $1/E$ at $E\to0$, and the original code regulates it by hand. Physically no state lies below the kaon, so a lower edge $E\ge M_K$ is available and makes the regulator unnecessary.
 \end{enumerate}
-The remedy proposed here keeps the structure of the calculation but replaces the support $(0,1]$ by $[-1,1]$ and replaces
-the Chebyshev truncation by a moment problem whose answer is an \emph{interval}.
 
+This note proposes a remedy that keeps the logic of the calculation but changes two things. First, the support of the measure is enlarged from $(0,1]$ to $[-1,1]$, which is what the transfer matrix allows.
+We test this hypothesis directly on the data with Hausdorff moment conditions. Second, the truncated expansion is replaced by an optimisation. Instead of one estimate with an uncontrolled truncation error,
+we compute the \emph{largest and smallest} kernel integral compatible with the data and the hypothesis. The answer is an interval, and each end comes with a polynomial certificate that can be checked independently.
+
+\paragraph{Outline.} Sec.~\ref{sec:summary} summarises the method and the result on one page. Sec.~\ref{sec:setup} writes the decay rate as a linear functional of the correlator and fixes all normalisations.
+Sec.~\ref{sec:support} discusses the support of the spectral measure. Sec.~\ref{sec:bounds} is the core of the note and develops the bounds in detail. Sec.~\ref{sec:hausdorff} tests the hypothesis,
+Sec.~\ref{sec:cheb} explains why the old Chebyshev coefficients leave $[-1,1]$, Sec.~\ref{sec:results} gives the results, and Sec.~\ref{sec:limits} states what is and what is not shown.
 
 \subsection{The method in one page}\label{sec:summary}
 \begin{enumerate}[leftmargin=*,itemsep=2pt]
-\item \textbf{Data.} The eight $\gamma$ channels of the $\bar us$ correlator are combined into $A_T,V_T$ ($J=0$) and $A_S,V_S$ ($J=1$);
-      the renormalised, per-volume correlator is $C_{\rm ren}=Z^2C_{\rm file}/L^3$ (Eq.~\ref{eq:norm}) and the rate is a linear functional of it,
-      $\Sigma_{\rm tot}=\sum_c\int\dd\hat E\,(2/\hat E)K_J\hat\rho_c$ with $\Gapp=(a^{-1})^2\hat\Sigma$ (Eqs.~\ref{eq:Gapp_E}--\ref{eq:channels}).
-\item \textbf{Hypothesis (new).} $C(t)=\int\dd\sigma(\lambda)\,\lambda^{t-1}$ for $t\ge1$ with $\sigma\ge0$ supported on
-      $[-1,\ee^{-M_0}]$, where $M_0$ is the kaon mass (Eq.~\ref{eq:model}). The old method has $\sigma$ on $(0,\ee^{-M_0}]$ only.
-\item \textbf{Constraints.} The moments $m_k=\int\dd\sigma\lambda^k$ must lie in $C(k+1)\pm z\delta_{k+1}$, $k=0,\dots,T-1$ (Eq.~\ref{eq:primal}).
-\item \textbf{Bounds.} The largest and smallest value of $\int g\,\dd\sigma$ over all such $\sigma$ is a linear program; its dual is a polynomial $p\ge g$ that
-      certifies the bound (Sec.~\ref{sec:bounds}). Negative-$\lambda$ states can absorb moment budget but never contribute to the rate.
+\item \textbf{Data.} The eight $\gamma$ structures of the $\bar us$ correlator are grouped into $A_T,V_T$ (temporal, $J=0$) and $A_S,V_S$ (spatial, $J=1$).
+      After renormalisation and division by the volume, $C_{\rm ren}=Z^2C_{\rm file}/L^3$ (Eq.~\ref{eq:norm}), the rate is a linear functional of the correlator:
+      $\hat\Sigma_{\rm tot}=\sum_c\int\dd\hat E\,(2/\hat E)K_J\hat\rho_c$ and $\Gapp=(a^{-1})^2\hat\Sigma$ (Eqs.~\ref{eq:Gapp_E}--\ref{eq:channels}).
+\item \textbf{Hypothesis.} $C(t)=\int\dd\sigma(\lambda)\,\lambda^{t-1}$ for $t\ge1$, with $\sigma\ge0$ supported on $[-1,\ee^{-M_0}]$ and $M_0$ the kaon mass (Eq.~\ref{eq:model}).
+      The old method assumes support on $(0,\ee^{-M_0}]$.
+\item \textbf{Constraints.} The moments $m_k=\int\lambda^k\dd\sigma$ must lie in $C(k+1)\pm z\delta_{k+1}$ for $k=0,\dots,T-1$ (Eq.~\ref{eq:primal}).
+\item \textbf{Bounds.} The largest and smallest $\int g\,\dd\sigma$ over all such $\sigma$ are solutions of a linear program. Its dual is a polynomial $p\ge g$ (or $q\le g$) that
+      certifies the bound (Sec.~\ref{sec:bounds}). Negative-$\lambda$ states can absorb part of the moments, but they never contribute to the rate.
 \item \textbf{Rate.} $\Vus=\sqrt{\BR_s\Gamma_\tau\big/\big(S_{EW}\tfrac{G_F^2m_\tau^3}{16\pi}\Sigma_{\rm tot}\big)}$, with
       $\BR_s=0.02908(48)$ from HFLAV 2023 (Sec.~11.6.1 of arXiv:2411.18639).
 \end{enumerate}
-\textbf{Result on the RBC/UKQCD $48^3\times96$ and $64^3\times128$ data.} The support $(0,1]$ cannot reproduce the $J=0$ channels within $3\sigma$
-(it needs $z^*=3.3$--$19$); $[-1,1]$ can ($z^*\le0.1$). The certified interval is $0.198\le\Vus\le0.249$ (both ensembles, $z=3$, $T=18$), or
-$0.196\le\Vus\le0.251$ with the $\BR_s$ error added; it contains the HFLAV lattice-inclusive value $0.2189(19)$ and the OPE value $0.2184(21)$.
-It is a guarantee, about $\pm11\%$ wide, not a precision determination.
+\textbf{Result.} On the RBC/UKQCD $48^3\times96$ and $64^3\times128$ ensembles, a positive measure on $(0,1]$ cannot reproduce the $J=0$ channels within $3\sigma$
+(it needs $z^*=3.3$--$19$), while one on $[-1,1]$ can ($z^*\le0.1$). The certified interval is $0.198\le\Vus\le0.249$ (both ensembles, $z=3$, $T=18$), or
+$0.196\le\Vus\le0.251$ with the $\BR_s$ error included. It contains the HFLAV lattice-inclusive value $0.2189(19)$ and the OPE value $0.2184(21)$.
+The interval is about $\pm11\%$ wide. It is a guarantee, not a precision determination.
 
-\paragraph{Conventions.} $E$ is an energy, $\lambda=\ee^{-E}$. Lattice quantities carry no unit (a hat when ambiguity is possible);
-$a^{-1}$ converts to GeV. $T$ is the number of correlator values used, $t=1,\dots,T$.
+\paragraph{Conventions.} $E$ is an energy and $\lambda=\ee^{-E}$. Lattice quantities are dimensionless and carry a hat where confusion is possible;
+$a^{-1}$ converts them to GeV. $T$ is the number of correlator values used, $t=1,\dots,T$.
+
 %--------------------------------------------------------------------
-\section{From the decay rate to a linear functional of the correlator}
+\section{From the decay rate to a linear functional of the correlator}\label{sec:setup}
+This section rewrites the decay rate step by step as $\int g\,\dd\sigma$ for a known function $g$. Each step is checked against the single-state case, where the answer is known in closed form.
+
 \subsection{The rate}
-Following your note (Eq.~(28)), with $y=Q^2/m_\tau^2$ and $\Gamma_0=m_\tau^5G_F^2/(192\pi^3)$,
+Following Eq.~(28) of Ref.~\cite{Chen:TauNote}, with $y=Q^2/m_\tau^2$ and $\Gamma_0=m_\tau^5G_F^2/(192\pi^3)$,
 \begin{equation}
  R\equiv\frac{\Gamma}{\Gamma_0}=12\pi^2|V_{us}|^2S_{EW}\int_0^{m_\tau^2}\frac{\dd Q^2}{m_\tau^2}(1-y)^2\Big[(1+2y)\rho^{(1)}(Q^2)+\rho^{(0)}(Q^2)\Big].
 \end{equation}
-Multiplying by $\Gamma_0$ and using $12\pi^2/(192\pi^3)=1/(16\pi)$,
+Multiplying by $\Gamma_0$ and using $12\pi^2/(192\pi^3)=1/(16\pi)$ gives
 \begin{align}
  \Gamma(\tau\to X_s\nu)&=\Vus^2\,S_{EW}\,\frac{G_F^2m_\tau^3}{16\pi}\;\Gapp,\\
  \Gapp&\equiv\int_0^{m_\tau^2}\dd Q^2\Big[K_1(y)\rho^{(1)}(Q^2)+K_0(y)\rho^{(0)}(Q^2)\Big],\\
  K_1(y)&=(1-y)^2(1+2y)\,\theta(1-y),\qquad K_0(y)=(1-y)^2\,\theta(1-y).
 \end{align}
-This is Eq.~(44) of your note with $\Gamma_{\rm Exp}\to\BR_s\Gamma_\tau$ in the numerator.
+This is Eq.~(44) of Ref.~\cite{Chen:TauNote}, with the measured width $\Gamma_{\rm Exp}=\BR_s\Gamma_\tau$ on the left-hand side.
 
-\paragraph{Check with the kaon pole.} Take $\rho^{(0)}=f_K^2\delta(Q^2-M_K^2)$ (your Eq.~(25)). Then
-$\Gapp=f_K^2K_0(M_K^2/m_\tau^2)=f_K^2(1-M_K^2/m_\tau^2)^2$, which reproduces Eq.~(26),
+\paragraph{Check with the kaon pole.} For $\rho^{(0)}=f_K^2\delta(Q^2-M_K^2)$ we get
+$\Gapp=f_K^2K_0(M_K^2/m_\tau^2)=f_K^2(1-M_K^2/m_\tau^2)^2$. This reproduces the textbook width
 $\Gamma(\tau\to K\nu)=G_F^2f_K^2m_\tau^3(1-M_K^2/m_\tau^2)^2|V_{us}|^2/(16\pi)$.
-The $K^*$ with $\rho^{(1)}=f_{K^*}^2\delta(Q^2-M_{K^*}^2)$ gives $f_{K^*}^2(1-y)^2(1+2y)$, Eq.~(27).
+For the $K^*$, $\rho^{(1)}=f_{K^*}^2\delta(Q^2-M_{K^*}^2)$ gives $f_{K^*}^2(1-y)^2(1+2y)$, again as expected.
 
 \subsection{Spectral representation of the correlator}
-Your Eq.~(29) is
+The zero-momentum correlator is the Laplace transform of the spectral function:
 \begin{equation}
  C(t)=\int_0^\infty\dd Q\,Q^2\rho(Q^2)\,\ee^{-Qt}\;\equiv\;\int_0^\infty\dd E\,\rho_E(E)\,\ee^{-Et},\qquad \rho_E(E)=E^2\rho(E^2).
  \label{eq:spec}
 \end{equation}
-The overall normalisation is fixed by the one-state case, Eqs.~(48) and (51) of your note: a single state of mass $M$ and
-decay constant $f$ gives the renormalised, per-volume correlator
+We fix its normalisation with a single state of mass $M$ and decay constant $f$. Following Eqs.~(48) and (51) of Ref.~\cite{Chen:TauNote}, the renormalised correlator per unit volume is
 \begin{equation}
  C_{\rm ren}(t)\equiv\frac{Z^2\,C_{\rm file}(t)}{L^3}=\frac{Mf^2}{2}\,\ee^{-Mt},
  \qquad f=Z\sqrt{\frac{2A}{ML^3}}\ \ (C_{\rm file}\simeq A\ee^{-Mt}),
  \label{eq:norm}
 \end{equation}
-i.e.\ $\rho_E=\tfrac12Mf^2\delta(E-M)$. With $\delta(E-M)=2M\,\delta(E^2-M^2)$ this is
-$\rho(Q^2)=\rho_E/E^2=f^2\delta(Q^2-M^2)$, consistent with Eq.~(25). The general case follows by linearity. Here $Z=Z_A=Z_V$ (your Tables~2--4).
+so $\rho_E=\tfrac12Mf^2\delta(E-M)$. Since $\delta(E-M)=2M\,\delta(E^2-M^2)$, this is
+$\rho(Q^2)=\rho_E/E^2=f^2\delta(Q^2-M^2)$, the same normalisation as above. The general case follows by linearity. Here $Z=Z_A=Z_V$.
 
-\subsection{Rewriting $\Gapp$ in the energy variable}
-Substitute $Q^2=E^2$, $\dd Q^2=2E\,\dd E$ in $\Gapp$ and use $\rho(E^2)=\rho_E(E)/E^2$:
+\subsection{The rate in the energy variable}
+Substituting $Q^2=E^2$, $\dd Q^2=2E\,\dd E$ and $\rho(E^2)=\rho_E(E)/E^2$ gives
 \begin{equation}
  \int\dd Q^2K(Q^2)\rho(Q^2)=\int\dd E\,2E\,K\,\frac{\rho_E(E)}{E^2}=\int_0^\infty\dd E\;\frac{2}{E}\,K(E)\,\rho_E(E).
  \label{eq:Gapp_E}
 \end{equation}
-\emph{Check:} $\rho_E=\tfrac12Mf^2\delta(E-M)$ gives $\frac{2}{M}\frac12Mf^2K=f^2K$, as it must.
+For the single state, $\rho_E=\tfrac12Mf^2\delta(E-M)$ gives $\frac{2}{M}\cdot\frac12Mf^2K=f^2K$, as it must. The factor $2/E$ is the origin of the divergence at $E\to0$.
 
 \subsection{Lattice units}
-Let $\hat E=aE$ and let $c(t)=Z^2C_{\rm file}/L^3$ be the correlator in lattice units, $c(t)=\int\dd\hat E\,\hat\rho(\hat E)\ee^{-\hat Et}$.
-For one state $\hat M=aM$ and $\hat f=af$ in Eq.~(\ref{eq:norm}). Then, with $\hat\Sigma\equiv\int\dd\hat E\,(2/\hat E)K\,\hat\rho$,
+Let $\hat E=aE$, and write the renormalised correlator in lattice units as $c(t)=Z^2C_{\rm file}/L^3=\int\dd\hat E\,\hat\rho(\hat E)\ee^{-\hat Et}$.
+For a single state $\hat M=aM$ and $\hat f=af$ in Eq.~(\ref{eq:norm}). Defining $\hat\Sigma\equiv\int\dd\hat E\,(2/\hat E)K\,\hat\rho$,
 \begin{equation}
  \hat\Sigma=\hat f^2K=a^2f^2K=a^2\,\Gapp
- \qquad\Longrightarrow\qquad \Gapp=(a^{-1})^2\,\hat\Sigma .
+ \qquad\Longrightarrow\qquad \Gapp=(a^{-1})^2\,\hat\Sigma ,
  \label{eq:units}
 \end{equation}
-By linearity this holds for any $\hat\rho$. \emph{It is $(a^{-1})^2$, not $(a^{-1})^3$}; $K$ is evaluated at
-$y=(a^{-1}\hat E)^2/m_\tau^2$, so the kernel edge sits at $\hat E=m_\tau a=1.027$ (48I) and $0.753$ (64I).
+and by linearity this holds for any $\hat\rho$. Note that the conversion factor is $(a^{-1})^2$, not $(a^{-1})^3$. The kernel is evaluated at
+$y=(a^{-1}\hat E)^2/m_\tau^2$, so its edge sits at $\hat E=m_\tau a=1.027$ (48I) and $0.753$ (64I).
 
-\subsection{Which component carries $J=0$ and which $J=1$}
-Write the vacuum polarisation as
-$\Pi^{\mu\nu}(q)=(q^\mu q^\nu-q^2g^{\mu\nu})\Pi^{(1)}+q^\mu q^\nu\Pi^{(0)}$. At zero spatial momentum $q=(q^0,\vec0)$:
+\subsection{Which components carry $J=0$ and $J=1$}
+Decompose the vacuum polarisation as
+$\Pi^{\mu\nu}(q)=(q^\mu q^\nu-q^2g^{\mu\nu})\Pi^{(1)}+q^\mu q^\nu\Pi^{(0)}$. At zero spatial momentum, $q=(q^0,\vec0)$ and $q^2=q_0^2$, so
 \begin{align}
- \Pi^{00}&=(q_0^2-q^2)\Pi^{(1)}+q_0^2\Pi^{(0)}=q_0^2\,\Pi^{(0)}\qquad(q^2=q_0^2),\\
+ \Pi^{00}&=(q_0^2-q^2)\Pi^{(1)}+q_0^2\Pi^{(0)}=q_0^2\,\Pi^{(0)},\\
  \Pi^{ii}&=-q^2g^{ii}\,\Pi^{(1)}=q^2\,\Pi^{(1)}\qquad(\text{no sum over } i,\ g^{ii}=-1).
 \end{align}
-Hence the temporal components ($A_T=\gamma_5\gamma_4$, $V_T=\gamma_4$) carry $J=0$ and the spatial ones, averaged over $i$,
-($A_S$, $V_S$) carry $J=1$:
+The temporal components ($A_T=\gamma_5\gamma_4$, $V_T=\gamma_4$) therefore carry $J=0$, and the spatial ones ($A_S$, $V_S$, averaged over $i$) carry $J=1$:
 \begin{equation}
  \Sig_{\rm tot}=\sum_{X\in\{A,V\}}\Big[\Sig^{(0)}_{X_T}+\Sig^{(1)}_{X_S}\Big],\qquad
  \Sig^{(J)}_{c}=(a^{-1})^2\!\int\!\dd\hat E\,\frac{2}{\hat E}K_J\,\hat\rho_c .
  \label{eq:channels}
 \end{equation}
-In the RBC files the eight gamma matrices are $g=1,2,4\to V_{x,y,z}$, $8\to V_T$, $14,13,11\to A_{x,y,z}$, $7\to A_T$.
-\emph{Remark.} The old \texttt{vus()} assigns $J=1$ to both axial terms and $J=0$ to both vector terms, which disagrees with Eq.~(\ref{eq:channels}) and with
-the mock code in the same file.
+In the RBC files the gamma labels are $g=1,2,4\to V_{x,y,z}$, $8\to V_T$, $14,13,11\to A_{x,y,z}$ and $7\to A_T$.
+The original \texttt{vus()} assigns $J=1$ to both axial terms and $J=0$ to both vector terms. This disagrees with Eq.~(\ref{eq:channels}) and with
+the mock-data code in the same file.
 
 %--------------------------------------------------------------------
-\section{The support of the spectral measure}
-\subsection{Positive transfer matrix}
-If the one-step transfer matrix $\hat T=\ee^{-\hat H}$ is Hermitian and positive, with eigenvalues $\lambda_n=\ee^{-E_n}\in(0,1]$ and overlaps
+\section{The support of the spectral measure}\label{sec:support}
+\subsection{The standard assumption}
+If the one-step transfer matrix $\hat T=\ee^{-\hat H}$ is Hermitian and positive, it has eigenvalues $\lambda_n=\ee^{-E_n}\in(0,1]$. With overlaps
 $c_n=\langle n|J|0\rangle$,
 \begin{equation}
  C(t)=\sum_n|c_n|^2\lambda_n^{\,t}=\int\dd\nu(\lambda)\,\lambda^t,\qquad \nu\ge0,\ \ \mathrm{supp}\,\nu\subset(0,1].
 \end{equation}
-This is the hypothesis behind the shifted-Chebyshev method.
+The shifted-Chebyshev method rests on this representation.
 
-\subsection{$M_5>1$}
-Syritsyn and Negele \cite{Syritsyn:2007} construct $\hat T$ for Shamir domain-wall fermions: its eigenvalues are real,
-and negative ones appear for $M_5>1$. They do not discuss the sign of the weights. If only link reflection positivity holds,
-the natural form is
+\subsection{What changes for $M_5>1$}
+Syritsyn and Negele \cite{Syritsyn:2007} construct $\hat T$ for Shamir domain-wall fermions. Its eigenvalues are real, and for $M_5>1$ some of them are negative.
+They do not discuss the signs of the spectral weights. If only link reflection positivity holds, the natural representation is
 \begin{equation}
  C(t)=\sum_n|c_n|^2\lambda_n^{\,t-1}=\int\dd\sigma(\lambda)\,\lambda^{t-1},\qquad t\ge1,\qquad \sigma=\sum_n|c_n|^2\delta_{\lambda_n}\ge0,
  \quad \mathrm{supp}\,\sigma\subset[-1,1].
  \label{eq:model}
 \end{equation}
-Define the moments $m_k\equiv\int\dd\sigma\,\lambda^k=C(k+1)$, $k=0,1,\dots$ ($C(0)$ is dropped: contact terms).
-For $\lambda>0$ the relation to the spectral density is $\dd\sigma=\lambda\hat\rho\,\dd\hat E$, because
-$\int\hat\rho\,\ee^{-\hat Et}\dd\hat E=\int\lambda^{t-1}(\lambda\hat\rho\,\dd\hat E)$. States with $\lambda<0$ carry
-$\sigma\ge0$ in this convention (a negative weight in $C(t)=\int\lambda^t\,\dd\nu$ with $\dd\nu=\dd\sigma/\lambda$).
+The moments of $\sigma$ are the correlator values, $m_k\equiv\int\dd\sigma\,\lambda^k=C(k+1)$ for $k=0,1,\dots$. We drop $C(0)$ because it contains contact terms.
+For $\lambda>0$ the measure is related to the spectral density by $\dd\sigma=\lambda\hat\rho\,\dd\hat E$, since
+$\int\hat\rho\,\ee^{-\hat Et}\dd\hat E=\int\lambda^{t-1}(\lambda\hat\rho\,\dd\hat E)$. A state with $\lambda<0$ has positive weight in $\sigma$.
+In the form $C(t)=\int\lambda^t\,\dd\nu$ it would have negative weight, since $\dd\nu=\dd\sigma/\lambda$.
 
-\paragraph{Hypotheses.} $H_{[0,1]}$: $\mathrm{supp}\,\sigma\subset(0,1]$ (old). $H_{[-1,1]}$: $\mathrm{supp}\,\sigma\subset[-1,1]$ (new).
-$H_{[-1,1]}$ is weaker, contains $H_{[0,1]}$, and is \emph{not proven} for $M_5=1.8$ M\"obius fermions; it can only be tested.
+\paragraph{Two hypotheses.} We compare
+$H_{[0,1]}$: $\mathrm{supp}\,\sigma\subset(0,1]$ (the old assumption), and $H_{[-1,1]}$: $\mathrm{supp}\,\sigma\subset[-1,1]$ (the new one).
+$H_{[-1,1]}$ is weaker and contains $H_{[0,1]}$. It is \emph{not proven} for M\"obius fermions at $M_5=1.8$, so we test it on the data in Sec.~\ref{sec:hausdorff}.
 
-\paragraph{Parity of the start time.} For the sequence $s_k=C(t_s+k)=\int\dd\sigma\,\lambda^{t_s-1}\lambda^k$ to be moments of a positive measure
-on $[-1,1]$ we need $\lambda^{t_s-1}\ge0$ there, i.e.\ $t_s-1$ even, $t_s$ odd. For even $t_s$ the negative-$\lambda$ states enter with negative weight.
-The old method normalises with $2t_0=1$, an odd $t_s$.
+\paragraph{Parity of the start time.} For the shifted sequence $s_k=C(t_s+k)=\int\dd\sigma\,\lambda^{t_s-1}\lambda^k$ to be the moments of a positive measure
+on $[-1,1]$, the factor $\lambda^{t_s-1}$ must be non-negative there. This requires $t_s-1$ even, i.e.\ $t_s$ odd. For even $t_s$ the negative-$\lambda$ states enter with negative weight,
+and positivity tests are expected to fail. The old method normalises with $2t_0=1$, an odd start time.
 
 %--------------------------------------------------------------------
 \section{Certified bounds: the new method}\label{sec:bounds}
-\subsection{The problem}
-Per channel $c$ with kernel $J$, let $\kappa_J(\lambda)=\frac{2}{E}K_J\big((a^{-1}E)^2/m_\tau^2\big)$ with $E=-\ln\lambda$. From
-Eqs.~(\ref{eq:channels}) and $\dd\sigma=\lambda\hat\rho\,\dd\hat E$,
+This section is the core of the note. Sec.~\ref{sec:idea} states the idea without formulas. Secs.~\ref{sec:problem}--\ref{sec:dual} set up the optimisation and derive the certificate.
+Sec.~\ref{sec:toy} works the method out by hand for two moments. Sec.~\ref{sec:numerics} describes what the code does and which step makes the result rigorous.
+Sec.~\ref{sec:extremal} shows what the extremal spectra look like on the data, and Sec.~\ref{sec:recipe} collects the steps.
+
+\subsection{The idea}\label{sec:idea}
+The data fix finitely many numbers, $C(1),\dots,C(T)$, each with an error. Many spectral measures reproduce them, and these measures give different values of the kernel integral
+$\hat\Sigma$. The Chebyshev method picks \emph{one} of them, through a truncated expansion and a prior, and quotes a central value whose truncation error is not controlled.
+We ask a different question: \emph{over all positive measures on the allowed support that reproduce the data within their errors, what are the largest and the smallest possible $\hat\Sigma$?}
+The answer is an interval that contains the true value whenever the hypotheses hold. No truncation, prior or basis enters.
+
+Two facts make this question tractable. First, $\hat\Sigma$ and the moments are both \emph{linear} in the measure, so finding the extremes is a linear program (LP).
+Second, every LP has a dual problem. Here the dual variables assemble into a polynomial $p(\lambda)$ that lies above the kernel. This polynomial can be checked after the fact:
+if $p\ge g$ on the support, the upper bound holds, regardless of how the solver arrived at it.
+
+\subsection{The optimisation problem}\label{sec:problem}
+For a channel $c$ with angular momentum $J$, define $\kappa_J(\lambda)=\frac{2}{E}K_J\big((a^{-1}E)^2/m_\tau^2\big)$ with $E=-\ln\lambda$. Combining
+Eq.~(\ref{eq:channels}) with $\dd\sigma=\lambda\hat\rho\,\dd\hat E$ gives
 \begin{equation}
- \hat\Sigma_c=\int\dd\sigma(\lambda)\,g(\lambda),\qquad g(\lambda)=\begin{cases}\kappa_J(\lambda)/\lambda,&0<\lambda\le\ee^{-M_0}\\ 0,&\lambda<0.\end{cases}
+ \hat\Sigma_c=\int\dd\sigma(\lambda)\,g(\lambda),\qquad g(\lambda)=\begin{cases}\kappa_J(\lambda)/\lambda,&0<\lambda\le\ee^{-M_0},\\ 0,&\lambda\le0.\end{cases}
  \label{eq:g}
 \end{equation}
-States with $\lambda<0$ are lattice artefacts: they contribute nothing to the physical rate but they consume the moment budget. The lower edge $E\ge M_0$
-(the kaon, the lightest $\bar us$ state) is necessary because $g\sim2/E$ diverges at $E\to0$.
-Bounds are sought for all positive measures consistent with the data:
+The function $g$ (black curve in Fig.~\ref{fig:cert}) has three regions, and it helps to keep them apart.
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+\item \emph{The kernel window,} $\lambda_c<\lambda\le\ee^{-M_0}$, i.e.\ $M_0\le E<m_\tau$, with $\lambda_c=\ee^{-am_\tau}$ ($0.358$ on 48I, $0.471$ on 64I). Only here is $g>0$.
+      It rises steeply towards the kaon; for $J=0$ on 48I, $g(\ee^{-M_0})=7.86$.
+\item \emph{Heavy states,} $0\le\lambda\le\lambda_c$, i.e.\ $E\ge m_\tau$. These states are kinematically closed, so $g=0$, but they still contribute to $C(t)$.
+\item \emph{Negative eigenvalues,} $-1\le\lambda<0$. These states of the transfer matrix (Sec.~\ref{sec:support}) have no physical energy, and we set $g=0$ for them.
+      This is an assumption: we treat them as lattice artefacts that are absent from the continuum spectral function.
+\end{itemize}
+States in the last two regions \emph{take up part of the moments without contributing to the rate}. This is the mechanism by which the data constrain $\hat\Sigma$ from below as well as from above.
+The upper edge $\ee^{-M_0}$, given by the kaon as the lightest $\bar us$ state, is needed because $g\sim2/E$ diverges as $E\to0$. Without it the upper bound would be infinite.
+
+We seek bounds over all positive measures that are consistent with the data:
 \begin{equation}
- \hat\Sigma^{\pm}=\ \sup/\inf\ \int g\,\dd\sigma\quad\text{s.t.}\quad \sigma\ge0\ \text{on}\ S,\quad |m_k-C(k+1)|\le z\,\delta_{k+1},\ \ k=0,\dots,T-1,
+ \hat\Sigma^{\pm}=\ \sup/\inf\ \int g\,\dd\sigma\quad\text{s.t.}\quad \sigma\ge0\ \text{on}\ S,\quad |m_k-C(k+1)|\le z\,\delta_{k+1},\ \ k=0,\dots,T-1.
  \label{eq:primal}
 \end{equation}
-with $S=[-1,\ee^{-M_0}]$ (new) or $(0,\ee^{-M_0}]$ (old), and $\delta_t$ the jackknife error of $C(t)$.
+Here $S=[-1,\ee^{-M_0}]$ (new) or $(0,\ee^{-M_0}]$ (old), $m_k=\int\lambda^k\dd\sigma$, and $\delta_t$ is the jackknife error of $C(t)$.
+The constraints are $T$ ``boxes'', one per correlator value, each with a half-width of $z$ standard deviations.
 
-\subsection{Weak duality (the certificate)}
-\begin{prop}
-Let $p(\lambda)=\sum_{k=0}^{T-1}p_k\lambda^k$ satisfy $p\ge g$ on $S$. Then for every $\sigma$ feasible in (\ref{eq:primal})
+\paragraph{Enlarging the support can only widen the interval.} Every measure on $(0,\ee^{-M_0}]$ is also a measure on $[-1,\ee^{-M_0}]$. The new feasible set therefore
+contains the old one, and
 \begin{equation}
- \int g\,\dd\sigma\ \le\ \sum_kp_kC(k+1)+z\sum_k|p_k|\,\delta_{k+1}.
+ [\hat\Sigma^-_{\rm old},\hat\Sigma^+_{\rm old}]\subseteq[\hat\Sigma^-_{\rm new},\hat\Sigma^+_{\rm new}]\qquad\text{whenever the old problem is feasible.}
 \end{equation}
+The new hypothesis is weaker and therefore safer. On our data the cost is small. For $J=0$ the old problem has no solution at all, and for $J=1$ its bounds are only slightly tighter (Table~\ref{tab:bounds}).
+
+\subsection{The dual: where the certificate comes from}\label{sec:dual}
+Write $C_k\equiv C(k+1)$ and $\delta_k\equiv\delta_{k+1}$. For the upper bound, attach a multiplier $y^+_k\ge0$ to $m_k\le C_k+z\delta_k$ and
+$y^-_k\ge0$ to $-m_k\le-(C_k-z\delta_k)$. For every feasible $\sigma$ and every choice $y^\pm\ge0$, the added terms are non-negative, so
+\begin{align}
+ \int g\,\dd\sigma\ &\le\ \int g\,\dd\sigma+\sum_k y^+_k\big(C_k+z\delta_k-m_k\big)+\sum_k y^-_k\big(m_k-C_k+z\delta_k\big)\nonumber\\
+ &=\int\big(g-p\big)\dd\sigma+\sum_k\big[p_kC_k+z\delta_k(y^+_k+y^-_k)\big],
+\end{align}
+where $p_k\equiv y^+_k-y^-_k$ and $p(\lambda)=\sum_kp_k\lambda^k$. If $p\ge g$ on $S$, the first term is $\le0$ because $\sigma\ge0$. It is optimal to make at most one of $y^\pm_k$ non-zero,
+in which case $y^+_k+y^-_k=|p_k|$. This proves:
+\begin{prop}\label{prop:cert}
+Let $p(\lambda)=\sum_{k=0}^{T-1}p_k\lambda^k$ satisfy $p\ge g$ on $S$. Then every $\sigma$ that is feasible in (\ref{eq:primal}) satisfies
+\begin{equation}
+ \int g\,\dd\sigma\ \le\ U(p)\equiv\sum_kp_kC(k+1)+z\sum_k|p_k|\,\delta_{k+1}.
+ \label{eq:cert}
+\end{equation}
+Likewise, if $q\le g$ on $S$, then $\int g\,\dd\sigma\ge L(q)\equiv\sum_kq_kC(k+1)-z\sum_k|q_k|\,\delta_{k+1}$.
 \end{prop}
-\begin{proof}
-$\int g\,\dd\sigma\le\int p\,\dd\sigma=\sum_kp_km_k$ (since $\sigma\ge0$ and $p\ge g$). Write $m_k=C(k+1)+\epsilon_k$ with $|\epsilon_k|\le z\delta_{k+1}$;
-then $\sum p_k\epsilon_k\le z\sum|p_k|\delta_{k+1}$.
-\end{proof}
-The lower bound is the mirror image with a polynomial $q\le g$ and $-z\sum|q_k|\delta_{k+1}$.
-Minimising the right-hand side over $p$ is the dual of (\ref{eq:primal}); strong duality holds for the moment problem on a compact set, and for polynomial $g$ the condition $p-g\ge0$ on $[-1,1]$ is equivalent to
-$p-g=s_0+(1-\lambda^2)s_1$ with sums of squares $s_0,s_1$ (Luk\'acs), i.e.\ a semidefinite program.
+The best certificate minimises $U(p)$ over all polynomials with $p\ge g$ on $S$. This is the \emph{dual} of (\ref{eq:primal}). For the moment problem on a compact interval there is
+no duality gap, so $\min_pU(p)=\hat\Sigma^+$. Three properties of the dual help in reading the results.
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+\item \emph{Sensitivity.} $p_k=\partial\hat\Sigma^+/\partial C(k+1)$, so the certificate tells how much the bound moves when one data point moves. The term $z|p_k|\delta_{k+1}$ is the
+      price paid for the error on $C(k+1)$. A polynomial with large alternating coefficients is penalised. This is the noise amplification of Sec.~\ref{sec:cheb} seen from the other side.
+\item \emph{Complementary slackness.} At the optimum, the maximising $\sigma$ puts weight only where $p(\lambda)=g(\lambda)$. Also, $y^+_k>0$ only if $m_k$ sits at the upper edge of its box.
+      In Fig.~\ref{fig:cert} each polynomial touches $g$ exactly at the atoms of the corresponding extremal measure.
+\item \emph{Role of the support.} The condition $p\ge g$ is imposed only on $S$. Under the old support, $p$ is unrestricted for $\lambda<0$. Under the new support, $p\ge0$ is also required on $[-1,0)$.
+      More constraints give a larger minimum. This is the dual form of the inclusion above.
+\end{itemize}
+If $g$ were a polynomial, the condition $p-g\ge0$ on $[-1,1]$ would be equivalent to $p-g=s_0+(1-\lambda^2)s_1$ with sums of squares $s_0,s_1$ (Luk\'acs).
+That turns the dual into a semidefinite program, and it is the grid-free version listed under next steps in Sec.~\ref{sec:limits}.
 
-\subsection{Numerics and what is rigorous}
-$g$ is not a polynomial, so I solve the primal on a fine grid of $\lambda$ (about $6\times10^3$ points, variables $u_i\ge0$ rescaled by $C(1)$, \texttt{scipy.optimize.linprog}/HiGHS).
-This gives an \emph{inner} approximation. The dual variables $y^\pm_k$ of the two inequality rows of moment $k$ give $p_k=(y^+_k-y^-_k)/\delta_{k+1}$ with $p\ge g$ on the grid.
-\emph{The rigorous step:} $p-g$ is evaluated on a dense grid of $2\times10^5$ points of the whole support, $p$ is lifted by the largest violation $\Delta$ ($p_0\to p_0+\Delta$),
-and the proposition is applied. On the data the certified and the grid bounds differ by at most $3\times10^{-5}\,\mathrm{GeV}^2$ (Table~\ref{tab:bounds}).
-(The check on a dense grid is numerical, not an analytic proof of $p\ge g$; $g$ is smooth and the lift is small.)
+\subsection{A worked example with two moments}\label{sec:toy}
+To see how the bounds arise, take $T=2$ and exact data ($z\delta\to0$). Let $m_0=C(1)$, and let $\mu=C(2)/C(1)$ be the mean of $\lambda$ under the normalised measure $\sigma/m_0$.
+The certificate is now a straight line, $p(\lambda)=a+b\lambda$, and $U=m_0(a+b\mu)$ is $m_0$ times its value at $\lambda=\mu$. The lowest line that stays above $g$ on $S$, evaluated at $\mu$,
+is the \emph{concave envelope} $\hat g_S(\mu)$. Similarly, the highest line below $g$ gives the convex envelope $\check g_S(\mu)$. Therefore
+\begin{equation}
+ m_0\,\check g_S(\mu)\ \le\ \hat\Sigma\ \le\ m_0\,\hat g_S(\mu).
+\end{equation}
+For the $A_T$ channel on 48I we have $\mu=0.104$, $\ee^{-M_0}=0.750$ and $g(\ee^{-M_0})=7.86$.
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+\item \emph{Lower bound.} Since $\mu<\lambda_c=0.358$, a single atom at $\lambda=\mu$, i.e.\ one state above $m_\tau$, reproduces both moments and contributes nothing to the rate. Hence $\hat\Sigma^-=0$:
+      two moments cannot tell that a kaon is present.
+\item \emph{Upper bound.} $g$ vanishes left of $\lambda_c$ and is convex inside the window, so $\hat g_S$ is the chord from the left end of $S$ to the point $(\ee^{-M_0},g(\ee^{-M_0}))$.
+      The maximising measure is an atom at the kaon plus an atom at the left end of $S$. With the old support the left end is $\lambda=0$, and $\hat\Sigma^+=m_0\,g(\ee^{-M_0})\,\mu/\ee^{-M_0}=0.042$\,GeV$^2$.
+      With the new support it is $\lambda=-1$, and $\hat\Sigma^+=m_0\,g(\ee^{-M_0})(1+\mu)/(1+\ee^{-M_0})=0.189$\,GeV$^2$.
+      An atom at $\lambda=-1$ lowers $m_1$, which leaves room for more weight on the kaon.
+\end{itemize}
+The LP reproduces both numbers to five digits. Adding moments closes the interval quickly. With the new support and $z=3$:
+\begin{center}\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lcccccc}
+\toprule
+$T$ & 2 & 4 & 6 & 8 & 12 & 18\\
+\midrule
+$\hat\Sigma_{A_T}$ [GeV$^2$] & $[0,\,0.189]$ & $[0.0177,\,0.0232]$ & $[0.0203,\,0.0214]$ & $[0.0205,\,0.0212]$ & $[0.0205,\,0.0212]$ & $[0.0205,\,0.0212]$\\
+\bottomrule
+\end{tabular}
+\end{center}
+The reason is visible in the effective mass of $A_T$: $2.26$, $0.77$, $0.46$, $0.32$, $0.30$, $0.29$ at $t=1,\dots,6$. The kaon ($aM_K=0.288$) dominates from $t\approx5$.
+Once the moments reach that far, the weight at the kaon is pinned, and the interval closes to $\pm2\%$ around the kaon-pole value $0.0208$.
+With the old support the same problem has no solution from $T=6$ on.
 
-\paragraph{Statistical meaning.} Each box is $\pm z\delta_t$. With Gaussian errors the $T$ boxes jointly contain the truth with probability at least
-$1-T\cdot0.0027$ for $z=3$ (Bonferroni): $\ge95\%$ for $T=18$. The covariance between $t$ is not used.
+\subsection{Numerics, and which step is rigorous}\label{sec:numerics}
+\paragraph{The linear program.} Because $g$ is not a polynomial, we solve the primal problem on a grid $\{\lambda_i\}$ (function \texttt{make\_grid}). The grid has $3000$ points uniform in $E\in[M_0,3]$,
+$1000$ points in $[3,9]$, the points $E=14$ and $40$, and $\lambda=0$. For the new support it also has $900$ points in $[-1,-10^{-4}]$, uniform down to $-0.05$ and geometric below.
+The measure is $\sigma=\sum_iw_i\delta_{\lambda_i}$. We use variables $u_i=w_i/C(1)\ge0$ and divide each box by $\delta_{k+1}$, so all rows are of order one:
+\begin{equation}
+ \max/\min\ \sum_iC(1)g(\lambda_i)\,u_i\quad\text{s.t.}\quad \Big|\sum_i\frac{C(1)\lambda_i^k}{\delta_{k+1}}u_i-\frac{C(k+1)}{\delta_{k+1}}\Big|\le z,\quad k=0,\dots,T-1.
+\end{equation}
+The LP is solved with HiGHS through \texttt{scipy.optimize.linprog}. Restricting $\sigma$ to a grid can only shrink the feasible set, so the grid bounds are an \emph{inner} approximation:
+they can be too narrow, never too wide. The next step repairs this.
 
-\paragraph{Calibration.} A single state ($m=0.4937$\,GeV, $f=0.1564$\,GeV on 48I, errors $10^{-3}$) gives $\Sigma\in[0.02075,0.02089]\,\mathrm{GeV}^2$
-for both supports, around the exact $f^2(1-M^2/m_\tau^2)^2=0.02083$; the certificate reproduces the grid bound to $5$ digits.
+\paragraph{The extremal measures have few atoms.} A basic optimal solution has at most as many non-zero $u_i$ as there are active constraints. Since $z>0$, the two sides of a box cannot both be active.
+\emph{The extremal measures therefore have at most $T$ atoms.} On the data they have 5--8. This is why Fig.~\ref{fig:cert} shows a few isolated spikes; adjacent grid points occasionally share one atom.
 
-\subsection{Feasibility}
-The LP minimising $\max_t|\sum_i w_i\lambda_i^{t-1}-C(t)|/\delta_t$ gives the smallest $z^*$ at which a positive measure on $S$ reproduces the data.
+\paragraph{From the grid to a certificate.} The following steps make the bound rigorous (function \texttt{certified\_bounds}):
+\begin{enumerate}[leftmargin=*,itemsep=1pt]
+\item Read the dual values $y^\pm_k$ of the two rows of box $k$ from the solver and set $p_k=(y^+_k-y^-_k)/\delta_{k+1}$, which undoes the row scaling.
+      By LP duality, $p\ge g$ holds at every grid point.
+\item Evaluate $p-g$ on a much denser grid of the whole support: $2\times10^5$ points uniform in $\lambda$ over the positive part, the point $\lambda=0$, and $5\times10^4$ points in $[-1,0)$.
+\item Set $\Delta=\max(0,\max(g-p))$ and shift $p_0\to p_0+\Delta$. Now $p\ge g$ holds on the dense grid.
+\item Evaluate $U(p)$ from Eq.~(\ref{eq:cert}). For the lower bound, repeat with $q$, $\Delta=\max(0,\max(q-g))$, $q_0\to q_0-\Delta$, and $L(q)$.
+\end{enumerate}
+The shift moves the bound by about $\Delta\cdot C(1)$. On the data the certified and grid bounds differ by at most $3\times10^{-5}\,\mathrm{GeV}^2$ (Table~\ref{tab:bounds}).
+The dense-grid check is numerical, not an analytic proof that $p\ge g$. However, $g$ is smooth in each region and $p$ is a polynomial of degree at most $17$, so a violation would have to fit
+between grid points spaced by $3\times10^{-6}$. The sum-of-squares formulation above would remove this caveat.
+
+\paragraph{Statistical meaning.} Each box has half-width $z\delta_t$. With Gaussian errors, all $T$ boxes contain the true values with probability at least
+$1-T\cdot0.0027$ for $z=3$ (Bonferroni), i.e.\ at least $95\%$ for $T=18$. The covariance between different $t$ is not used. Including it, as an ellipsoid instead of a box, would shrink the feasible set
+and tighten the bounds.
+
+\paragraph{Choice of $T$.} At fixed $z$, each additional moment adds a constraint. The interval can therefore only shrink as $T$ grows, and the bound is valid for every $T$.
+Once $\delta_t/C(t)$ becomes large, the new box is too wide to ever be active, and the bounds stop improving (Fig.~\ref{fig:bounds}). We use $T=18$. The only cost of a larger $T$ is the Bonferroni factor.
+
+\paragraph{Calibration.} For a single state ($m=0.4937$\,GeV, $f=0.1564$\,GeV on 48I, relative errors $10^{-3}$) the method gives $\Sigma\in[0.02075,0.02089]\,\mathrm{GeV}^2$
+for both supports, around the exact value $f^2(1-M^2/m_\tau^2)^2=0.02083$. The certificate reproduces the grid bound to five digits.
+
+\subsection{What the extremal spectra look like}\label{sec:extremal}
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.96\textwidth]{figs/fig_cert.pdf}
+\caption{48I, $T=18$, $z=3$, new support. \emph{Left:} the kernel $g(\lambda)$ (black), the upper certificate $p\ge g$ (blue) and the lower certificate $q\le g$ (orange, dashed), read from the LP duals.
+\emph{Right:} the measures that attain the upper (blue) and lower (orange) bound, with weights relative to $C(1)$ on a log scale. Each certificate touches $g$ where its measure has an atom.
+The dotted line is the kernel edge $E=m_\tau$. Everything to its left contributes to $C(t)$ but not to $\Sigma$.}
+\label{fig:cert}
+\end{figure}
+Fig.~\ref{fig:cert} shows the most and least precise channels.
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+\item \emph{$A_T$ ($J=0$, interval $\pm1.7\%$).} Both extremal measures have an atom at the kaon, $\lambda=\ee^{-M_0}=0.750$, with weight $0.068\,C(1)$. It supplies $96$--$100\%$ of $\Sigma$.
+      The rest of the weight lies outside the window: at $\lambda\approx0.06$--$0.09$ ($\hat E\approx2.4$--$2.8$, far above $m_\tau$) and at $\lambda\approx-0.09$ to $-0.15$, where $7$--$19\%$ of the weight sits.
+      \emph{The data cannot be described without these negative-$\lambda$ atoms}: removing them, which is the old support, makes the problem infeasible at $z=3$ from $T=6$ on (Sec.~\ref{sec:feas}).
+      The upper and lower bounds differ only through a small amount of weight inside the window. The maximiser puts $0.7\%$ at $\lambda=0.56$, while the minimiser puts $3.9\%$ just outside the edge, at $\lambda=0.359$.
+\item \emph{$A_S$ ($J=1$, interval $\pm48\%$).} There is no isolated low-lying state. The maximiser places $8.5\%$ of the weight at $\lambda=0.45$ ($E=1.37$\,GeV). The minimiser places $1.3\%$ at $\lambda=0.54$
+      and $16\%$ just outside the edge. Both are in the $K^*$--$K_1$ region. Because these correlators decay quickly, the data do not determine \emph{where} inside the window the weight sits.
+      The relative error of $C(t)$ is $3\%$ at $t=10$ and $185\%$ at $t=18$. Since $g$ changes by a factor of several across the window, so does $\Sigma$. This channel limits the $\Vus$ interval.
+\end{itemize}
+The certificates themselves are ordinary polynomials of degree $17$. They follow $g$ closely near the atoms and are free elsewhere. For $A_T$, $p$ must stay non-negative on $[-1,0)$ and rises steeply towards $\lambda=-1$.
+This is where the new support costs something, and the cost is small because the data leave almost no room for weight there.
+
+\subsection{Feasibility}\label{sec:feas}
+Before computing bounds we ask whether any positive measure on $S$ reproduces the data at all. The smallest tolerance $z^*$ for which this is possible is again an LP:
+minimise $\max_t|\sum_i w_i\lambda_i^{t-1}-C(t)|/\delta_t$ over $w\ge0$.
 \begin{table}[h]
 \centering\small
 \begin{tabular}{lcccc}
@@ -251,32 +378,43 @@ $z^*$ at $T=14$ (old $[0,1]$ / new $[-1,1]$) & $A_T$ & $V_T$ & $A_S$ & $V_S$\\
 64I & 9.06 / 0.06 & 18.72 / 0.08 & 0.75 / 0.10 & 0.78 / 0.05\\
 \bottomrule
 \end{tabular}
-\caption{Minimal tolerance (in $\sigma$) for the data to be reproduced by a positive measure. For $T\ge6$ the $J=0$ channels need $z^*>3$ with the old support.}
+\caption{Minimal tolerance (in units of $\sigma$) for the data to be reproduced by a positive measure. For $T\ge6$ the $J=0$ channels need $z^*>3$ with the old support.}
 \end{table}
-At $z=3$ the old support is therefore \emph{infeasible} for $A_T$ and $V_T$, at both lattice spacings and for every $T\ge6$,
-which is the moment-problem version of ``the Chebyshev coefficients exceed 1''.
+At $z=3$ the old support is therefore \emph{infeasible} for $A_T$ and $V_T$, at both lattice spacings and for every $T\ge6$.
+This is the moment-problem version of the observation that ``the Chebyshev coefficients exceed 1''. The test uses the same LP and needs no input about $\Vus$.
+
+\subsection{The recipe}\label{sec:recipe}
+\begin{enumerate}[leftmargin=*,itemsep=1pt]
+\item For each channel, build $C_{\rm ren}(t)$ (Eq.~\ref{eq:norm}) and its jackknife error $\delta_t$ for $t=1,\dots,T$.
+\item Build the grid on $S=[-1,\ee^{-M_0}]$ and evaluate $g(\lambda)$ from Eq.~(\ref{eq:g}) for the channel's $J$.
+\item Compute $z^*$. If $z^*>z$, the hypothesis is rejected for this channel and no bound is computed.
+\item Solve the two LPs (\ref{eq:primal}) and read off $p$ and $q$ from the dual values.
+\item Check $p\ge g\ge q$ on the dense grid, shift by $\Delta$, and compute $U(p)$ and $L(q)$. These are $\hat\Sigma^\pm_c$.
+\item Add the four channels: $\Sigma^\pm_{\rm tot}=(a^{-1})^2\sum_c\hat\Sigma^\pm_c$. This is conservative, because each channel may sit at its own extreme.
+\item Convert to $\Vus\in\big[\sqrt{c/\Sigma^+_{\rm tot}},\sqrt{c/\Sigma^-_{\rm tot}}\big]$ with $c=\BR_s\Gamma_\tau/(S_{EW}G_F^2m_\tau^3/16\pi)$ (Sec.~\ref{sec:vus}).
+\end{enumerate}
 
 %--------------------------------------------------------------------
-\section{Testing the hypothesis: Hausdorff positivity}
-\subsection{Necessary conditions, proved}
-Let $P(\lambda)=\sum_{i=0}^nx_i\lambda^i$ be a real polynomial and $s_k=\int\dd\sigma\,\lambda^k\,\lambda^{t_s-1}$. If $\sigma\ge0$ on $[-1,1]$:
+\section{Testing the hypothesis: Hausdorff positivity}\label{sec:hausdorff}
+The feasibility test of Sec.~\ref{sec:feas} uses all moments together. This section gives an independent and more local test, based on the classical characterisation of moment sequences.
+
+\subsection{Necessary conditions}
+Let $P(\lambda)=\sum_{i=0}^nx_i\lambda^i$ be a real polynomial and $s_k=\int\dd\sigma\,\lambda^k\,\lambda^{t_s-1}$. If $\sigma\ge0$ on $[-1,1]$ and $t_s$ is odd, then
 \begin{align}
  x^{\!\top}H x&=\sum_{ij}x_ix_j\,s_{i+j}=\int\dd\sigma\,\lambda^{t_s-1}P(\lambda)^2\ \ge0,
  &H_{ij}&=s_{i+j},\label{eq:H0}\\
  x^{\!\top}H^{\rm loc}x&=\int\dd\sigma\,\lambda^{t_s-1}(1-\lambda^2)P(\lambda)^2\ \ge0,
  &H^{\rm loc}_{ij}&=s_{i+j}-s_{i+j+2}.\label{eq:Hloc}
 \end{align}
-For support $[0,1]$ the second matrix is $H^{\rm loc}_{ij}=s_{i+j+1}-s_{i+j+2}$, from the weight $\lambda(1-\lambda)$.
-Schm\"udgen \cite{Schmudgen:2020} proves that for $s_0,\dots,s_{2n}$ these conditions are also \emph{sufficient}
-(no rank condition on a compact interval). We only need necessity: a significantly negative eigenvalue \emph{excludes} the hypothesis;
-passing means compatibility, not proof.
+The Hankel matrix $H$ and the localizing matrix $H^{\rm loc}$ must therefore be positive semidefinite. For support $[0,1]$ the localizing matrix is instead $H^{\rm loc}_{ij}=s_{i+j+1}-s_{i+j+2}$, from the weight $\lambda(1-\lambda)$.
+Schm\"udgen \cite{Schmudgen:2020} shows that for $s_0,\dots,s_{2n}$ these conditions are also \emph{sufficient}, with no rank condition on a compact interval.
+Here only necessity matters. A significantly negative eigenvalue \emph{excludes} the hypothesis, while passing the test means compatibility, not proof.
 
 \subsection{Scaling and statistics}
-Scaling $H\to D^{-1}HD^{-1}$ with $D=\mathrm{diag}(\sqrt{|H_{ii}|})$ is a congruence and does not change positive semidefiniteness (Sylvester's law),
-and removes the strong decay of $s_k$. For each $(t_s,n)$ we compute the smallest eigenvalue $\mu_{\min}$ and its jackknife error over configurations, and
-call a matrix a \emph{violation} if $\mu_{\min}/\sigma<-3$, a \emph{pass} if $>3$.
-(The rows of the data files carry no configuration label; the autocorrelation along the row order is at the noise level,
-$|{\rm ac}|<0.05$ for lags $1$--$100$, so the jackknife error does not depend on the assumed ordering.)
+The values $s_k$ decay by orders of magnitude, so we scale $H\to D^{-1}HD^{-1}$ with $D=\mathrm{diag}(\sqrt{|H_{ii}|})$. This is a congruence, so by Sylvester's law it does not change positive semidefiniteness.
+For each $(t_s,n)$ we compute the smallest eigenvalue $\mu_{\min}$ and its jackknife error over configurations. We call a matrix a \emph{violation} if $\mu_{\min}/\sigma<-3$ and a \emph{pass} if $\mu_{\min}/\sigma>3$.
+The rows of the data files carry no configuration label. The autocorrelation along the row order is at the noise level
+($|{\rm ac}|<0.05$ for lags $1$--$100$), so the jackknife error does not depend on the assumed ordering.
 
 \subsection{Result}
 \begin{table}[h]
@@ -292,91 +430,95 @@ $A_T$ ($J=0$), 64I & $[-1,1]$ & 5/3/0 & 3/3/2 \\
 $A_T$ ($J=0$), 64I & $[0,1]$ & 3/3/\textbf{2} & 3/5/0 \\
 \bottomrule
 \end{tabular}
-\caption{Localizing matrices, $n\ge2$, $t_s\le8$. At odd $t_s$ the support $[-1,1]$ is never violated in any channel on either ensemble;
-the $J=0$ channels show the pattern expected for negative-$\lambda$ states. Full table: \texttt{hankel\_scan.py}.}
+\caption{Localizing matrices with $n\ge2$ and $t_s\le8$. At odd $t_s$ the support $[-1,1]$ is never violated, in any channel or ensemble.
+The $J=0$ channels show the pattern expected from negative-$\lambda$ states. The full table is produced by \texttt{hankel\_scan.py}.}
 \label{tab:hankel}
 \end{table}
-The $J=0$ channels violate $[0,1]$ at odd $t_s$ and $[-1,1]$ at even $t_s$, as predicted by Eq.~(\ref{eq:model}).
-The $J=1$ channels do not discriminate. Because the same data enter many $(t_s,n)$ tests, isolated $3\sigma$ violations are expected by chance;
-$V_T$ is also the least clean channel (a non-conserved local current for $m_u\ne m_s$).
+The pattern in Table~\ref{tab:hankel} is the one predicted by Eq.~(\ref{eq:model}). The $J=0$ channels violate $[0,1]$ at odd $t_s$, where negative-$\lambda$ states have positive weight that a $[0,1]$ measure cannot mimic.
+They violate $[-1,1]$ only at even $t_s$, where those states enter with negative weight.
+The $J=1$ channels pass every test and do not discriminate between the hypotheses. Because the same data enter many $(t_s,n)$ tests, isolated $3\sigma$ violations can occur by chance.
+$V_T$ is also the least clean channel, since the local vector current is not conserved for $m_u\ne m_s$.
 
 %--------------------------------------------------------------------
-\section{The Chebyshev coefficients}\label{sec:cheb}
+\section{Why the old Chebyshev coefficients leave $[-1,1]$}\label{sec:cheb}
 \subsection{Definitions and the old relation}
-With $\lambda=(1+\cos\theta)/2=\cos^2(\theta/2)$ set $T^*_j(\lambda)=\cos j\theta=T_j(2\lambda-1)$.
-Normalise $\bar C(t)=C(t+2t_0)/C(2t_0)=m_t/m_0\equiv\langle\lambda^t\rangle$. Then
+With $\lambda=(1+\cos\theta)/2=\cos^2(\theta/2)$, the shifted Chebyshev polynomials are $T^*_j(\lambda)=\cos j\theta=T_j(2\lambda-1)$.
+Normalise $\bar C(t)=C(t+2t_0)/C(2t_0)=m_t/m_0\equiv\langle\lambda^t\rangle$. Expanding $\lambda^t$ in Fourier modes,
 \begin{align}
  \lambda^t&=\cos^{2t}\!\tfrac\theta2=2^{-2t}\!\!\sum_{k=0}^{2t}\binom{2t}{k}\ee^{\ii(t-k)\theta}
  =2^{1-2t}\Big[\tfrac12\binom{2t}{t}+\sum_{j=1}^{t}\binom{2t}{t-j}\cos j\theta\Big],\\
- \bar C(t)&=2^{1-2t}\Big[\tfrac12\binom{2t}{t}+\sum_{j=1}^{t}\binom{2t}{t-j}\langle T^*_j\rangle\Big],\label{eq:cbar}
+ \bar C(t)&=2^{1-2t}\Big[\tfrac12\binom{2t}{t}+\sum_{j=1}^{t}\binom{2t}{t-j}\langle T^*_j\rangle\Big].\label{eq:cbar}
 \end{align}
-which is your Eq.~(56) (with $\langle T^*_0\rangle=1$ by normalisation). The old method fits $\langle T^*_j\rangle$ to $\bar C(t)$, $t=1,\dots,T$, with the
-prior $|\langle T^*_j\rangle|<1$ (through $\mathrm{erfinv}$).
-\subsection{The bound, and when it fails}
+This is Eq.~(56) of Ref.~\cite{Chen:TauNote}, with $\langle T^*_0\rangle=1$ by normalisation. The old method fits the $\langle T^*_j\rangle$ to $\bar C(t)$, $t=1,\dots,T$,
+with the prior $|\langle T^*_j\rangle|<1$ imposed through an $\mathrm{erfinv}$ map.
+
+\subsection{The bound, and how negative eigenvalues break it}
 \begin{lemma}
-If $\sigma\ge0$ is normalised on $[0,1]$, $|\langle T^*_n\rangle|\le1$. If $\sigma\ge0$ is normalised on $[-1,1]$, $|\langle T_n\rangle|\le1$.
+If $\sigma\ge0$ is normalised on $[0,1]$, then $|\langle T^*_n\rangle|\le1$. If $\sigma\ge0$ is normalised on $[-1,1]$, then $|\langle T_n\rangle|\le1$.
 \end{lemma}
 \begin{proof}
 $|T^*_n|\le1$ on $[0,1]$ and $|T_n|\le1$ on $[-1,1]$, so $|\langle T\rangle|\le\int|T|\,\dd\sigma\le\int\dd\sigma=1$.
 \end{proof}
-Now let a weight $w$ sit at $\lambda=-\varepsilon$ ($\varepsilon>0$). Since $2\lambda-1=-1-2\varepsilon<-1$,
+Now place a small weight $w$ at $\lambda=-\varepsilon$ with $\varepsilon>0$. Since $2\lambda-1=-1-2\varepsilon$ lies outside $[-1,1]$, the Chebyshev polynomial grows exponentially there:
 \begin{equation}
- T^*_n(-\varepsilon)=(-1)^n\cosh\!\big(n\,\mathrm{arccosh}(1+2\varepsilon)\big)\simeq\tfrac12(-1)^n\ee^{\,n\kappa},\quad \kappa=\mathrm{arccosh}(1+2\varepsilon),
+ T^*_n(-\varepsilon)=(-1)^n\cosh\!\big(n\,\mathrm{arccosh}(1+2\varepsilon)\big)\simeq\tfrac12(-1)^n\ee^{\,n\kappa},\quad \kappa=\mathrm{arccosh}(1+2\varepsilon).
 \end{equation}
-so the contribution $w\,T^*_n(-\varepsilon)$ exceeds $1$ for $n\gtrsim\ln(2/w)/\kappa$. For $\varepsilon=0.1$ ($\kappa=0.62$):
-$n\gtrsim8.5$ for $w=1\%$ and $n\gtrsim4.8$ for $w=10\%$. A small negative-$\lambda$ component is therefore enough to push the old
-coefficients out of $[-1,1]$ at the $n$ observed in the data.
+The contribution $w\,T^*_n(-\varepsilon)$ alone exceeds $1$ once $n\gtrsim\ln(2/w)/\kappa$. For $\varepsilon=0.1$ ($\kappa=0.62$) this happens at
+$n\gtrsim8.5$ for $w=1\%$ and at $n\gtrsim4.8$ for $w=10\%$. A small negative-$\lambda$ component is therefore enough to push the old
+coefficients out of $[-1,1]$ at the orders observed in the data. The extremal measures of Sec.~\ref{sec:extremal} have exactly such components, at $\lambda\approx-0.1$ with $7$--$19\%$ of the weight.
 
 \subsection{Noise amplification}
-The coefficients of $T^*_n(x)$ alternate in sign (all roots lie in $(0,1)$, Descartes), so $\sum_k|c_k|=|T^*_n(-1)|=T_n(3)\simeq\tfrac12(3+2\sqrt2)^n$.
-The coefficients of $T_n(x)$ alternate in $x^2$, so $\sum_k|c_k|=|T_n(\ii)|\simeq\tfrac12(1+\sqrt2)^n$. At $n=12$ these are $7.7\times10^{8}$ and
-$2.0\times10^{4}$: the $[-1,1]$ basis amplifies the statistical noise of the moments $\sim4\times10^4$ times less.
-The price is a coarser resolution in $\lambda$ (about a factor $2$ in the polynomial degree).
+The monomial coefficients $c_k$ of $T^*_n(x)$ alternate in sign, because all roots lie in $(0,1)$ (Descartes' rule). Hence $\sum_k|c_k|=|T^*_n(-1)|=T_n(3)\simeq\tfrac12(3+2\sqrt2)^n$.
+The coefficients of $T_n(x)$ alternate in $x^2$, so $\sum_k|c_k|=|T_n(\ii)|\simeq\tfrac12(1+\sqrt2)^n$. At $n=12$ these sums are $7.7\times10^{8}$ and
+$2.0\times10^{4}$. The $[-1,1]$ basis therefore amplifies the statistical noise of the moments about $4\times10^4$ times less.
+The price is a coarser resolution in $\lambda$, roughly a factor of two in polynomial degree.
 
 \subsection{Data}
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.92\textwidth]{figs/fig_cheb.pdf}
-\caption{$\langle T^*_n\rangle$ (old, orange) and $\langle T_n\rangle$ (new, blue) on 48I, four channels, jackknife errors; symmetric-log axis; the grey band is $[-1,1]$.
+\caption{$\langle T^*_n\rangle$ (old, orange) and $\langle T_n\rangle$ (new, blue) on 48I for the four channels, with jackknife errors, on a symmetric-log axis. The grey band is $[-1,1]$.
 The old coefficients leave the band at $n=5$--$8$ (e.g.\ $A_T$, $n=6$: $2.16\pm0.04$) and reach $10^2$--$10^3$ at $n=12$.
-The new ones stay inside for all channels and $n\le12$ (maximum $0.98$, error $\le0.02$). They follow $\cos(n\pi/2)$ because the measure sits near $\lambda=0$, so this is a necessary, weak test.}
+The new ones stay inside for all channels and $n\le12$ (maximum $0.98$, error $\le0.02$). They follow $\cos(n\pi/2)$ because the measure is concentrated near $\lambda=0$, so this is a necessary but weak test.}
+\label{fig:cheb}
 \end{figure}
 
 %--------------------------------------------------------------------
-\section{Results}
+\section{Results}\label{sec:results}
 \subsection{Channel bounds}
 \begin{table}[h]
-\centering\small
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
 \begin{tabular}{lcccc}
 \toprule
-$\hat\Sigma$ bounds [GeV$^2$], $T=18$, $z=3$, certified & $A_T$ & $V_T$ & $A_S$ & $V_S$\\
+$\hat\Sigma$ [GeV$^2$], $T=18$, $z=3$ & $A_T$ & $V_T$ & $A_S$ & $V_S$\\
 \midrule
 48I new $[-1,1]$ & [0.02048, 0.02119] & [0.00039, 0.00135] & [0.01021, 0.02894] & [0.03764, 0.05907]\\
 64I new $[-1,1]$ & [0.02048, 0.02125] & [0.00038, 0.00127] & [0.00617, 0.02761] & [0.03653, 0.05876]\\
 old $[0,1]$      & \multicolumn{2}{c}{infeasible} & \multicolumn{2}{c}{feasible, slightly tighter lower bounds}\\
 \bottomrule
 \end{tabular}
-\caption{Certified bounds per channel. The kaon pole alone gives $f_K^2(1-M_K^2/m_\tau^2)^2=0.02084$, inside the $A_T$ interval:
-the normalisation of Sec.~2 is confirmed on real data.
-Certified and grid bounds differ by at most $3\times10^{-5}$\,GeV$^2$.}
+\caption{Certified bounds per channel ($T=18$, $z=3$). The kaon pole alone gives $f_K^2(1-M_K^2/m_\tau^2)^2=0.02084$, inside the $A_T$ interval on both ensembles.
+This confirms the normalisation of Sec.~\ref{sec:setup} on real data. Certified and grid bounds differ by at most $3\times10^{-5}$\,GeV$^2$.}
 \label{tab:bounds}
 \end{table}
+Table~\ref{tab:bounds} lists the bounds per channel. The two lattice spacings agree within the intervals. The $A_T$ channel is fixed to $\pm2\%$ by the kaon, and the two $J=1$ channels dominate the width.
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.92\textwidth]{figs/fig_bounds.pdf}
-\caption{Bounds on $\hat\Sigma$ versus the number of moments $T$ (48I, $z=3$). New support: blue band. Old support: orange dashed, where feasible; infeasible for $A_T$, $V_T$ from $T=6$.
-Beyond $T\approx18$ the relative error of $C(t)$ exceeds $25\%$ and the bounds no longer improve. The $J=1$ axial channel is the loosest.}
+\caption{Bounds on $\hat\Sigma$ versus the number of moments $T$ (48I, $z=3$). New support: blue band. Old support: orange dashed where feasible; it is infeasible for $A_T$ and $V_T$ from $T=6$ on.
+Beyond $T\approx18$ the relative error of $C(t)$ exceeds $25\%$ and the bounds stop improving. The $J=1$ axial channel is the loosest.}
+\label{fig:bounds}
 \end{figure}
 
-\subsection{$\Vus$}
-Eq.~(44) with $\Gamma_{\rm Exp}=\BR_s\Gamma_\tau$ gives
+\subsection{$\Vus$}\label{sec:vus}
+Eq.~(44) of Ref.~\cite{Chen:TauNote} with $\Gamma_{\rm Exp}=\BR_s\Gamma_\tau$ gives
 \begin{equation}
  \Vus=\sqrt{\frac{\BR_s\,\Gamma_\tau}{S_{EW}\,\dfrac{G_F^2m_\tau^3}{16\pi}\ \Sigma_{\rm tot}}},\qquad
- \Sigma_{\rm tot}=\sum_{c}\Sigma_c^{\pm},
+ \Sigma_{\rm tot}=\sum_{c}\Sigma_c^{\pm}.
 \end{equation}
-with $\BR_s=0.02908\pm0.00048$ (HFLAV 2023, arXiv:2411.18639, Sec.~11.6.1, Eq.~(246); the fit table gives $\BR(\tau^-\to X_s^-\nu_\tau)=0.0291(5)$),
-$\Gamma_\tau=\hbar/\tau_\tau=2.267\times10^{-12}$\,GeV, $S_{EW}=1.0201$, $G_F^2m_\tau^3/(16\pi)=1.518\times10^{-11}\,\mathrm{GeV}^{-1}$. Bounds of the four independent channels add,
-which is conservative. Then $\Vus\in[\sqrt{c/\Sigma^+_{\rm tot}},\sqrt{c/\Sigma^-_{\rm tot}}]$ with $c=\BR_s\Gamma_\tau/(S_{EW}G_F^2m_\tau^3/16\pi)$.
+The inputs are $\BR_s=0.02908\pm0.00048$ (HFLAV 2023, arXiv:2411.18639, Sec.~11.6.1, Eq.~(246); the fit table gives $\BR(\tau^-\to X_s^-\nu_\tau)=0.0291(5)$),
+$\Gamma_\tau=\hbar/\tau_\tau=2.267\times10^{-12}$\,GeV, $S_{EW}=1.0201$ and $G_F^2m_\tau^3/(16\pi)=1.518\times10^{-11}\,\mathrm{GeV}^{-1}$. We add the bounds of the four channels,
+which is conservative since the channels are bounded independently. Then $\Vus\in[\sqrt{c/\Sigma^+_{\rm tot}},\sqrt{c/\Sigma^-_{\rm tot}}]$ with $c=\BR_s\Gamma_\tau/(S_{EW}G_F^2m_\tau^3/16\pi)$.
 \begin{table}[h]
 \centering\small
 \begin{tabular}{llccc}
@@ -392,14 +534,14 @@ ensemble & support & $\Sigma_{\rm tot}$ [GeV$^2$] & $\Vus$ & width\\
 \multicolumn{2}{l}{both ensembles, overlap ($z=2$)} & & [0.1998, 0.2351] & \\
 \bottomrule
 \end{tabular}
-\caption{$T=18$, $\BR_s=0.02908(48)$; $\Vus\propto\sqrt{\BR_s}$, so the $\BR_s$ error shifts the interval ends by $\mp0.8\%$. The $48$I and $64$I intervals are not combined into one fit.
-The value $\Sigma_{\rm tot}=0.0846$\,GeV$^2$ that corresponds to $\Vus=0.2243$ with this $\BR_s$ lies inside both intervals.
-For context (not used as input), HFLAV 2023 quotes $\Vus=0.2184(21)$ (OPE) and $0.2189(19)$ (lattice inclusive, Eq.~(249)); both are inside the interval.}
+\caption{$T=18$, $\BR_s=0.02908(48)$. Since $\Vus\propto\sqrt{\BR_s}$, the $\BR_s$ error shifts the interval ends by $\mp0.8\%$. The 48I and 64I intervals are intersected, not combined in a fit.
+The value $\Sigma_{\rm tot}=0.0846$\,GeV$^2$, which corresponds to $\Vus=0.2243$ with this $\BR_s$, lies inside both intervals.
+For context (not used as input), HFLAV 2023 quotes $\Vus=0.2184(21)$ (OPE) and $0.2189(19)$ (lattice inclusive, Eq.~(249)); both lie inside the interval.}
 \end{table}
 
-\subsection{Comparison with the old direct fit}
-Figure~\ref{fig:vus} shows the certified interval versus $T$ together with the values from the original code (run unchanged except for removing \texttt{cupy}), for both
-kernel assignments of Sec.~2.5. The old values change by $\pm30\%$ between consecutive $T$ and their quoted errors ($\approx6\times10^{-4}$) do not include the truncation error.
+\subsection{Comparison with the original code}
+Figure~\ref{fig:vus} compares the certified interval with the values from the original code, run unchanged except for the removal of \texttt{cupy}, for both
+kernel assignments discussed in Sec.~\ref{sec:setup}. The old values move by up to $\pm30\%$ between consecutive $T$, while their quoted errors ($\approx6\times10^{-4}$) do not include the truncation error.
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.96\textwidth]{figs/fig_vus.pdf}
@@ -407,50 +549,48 @@ kernel assignments of Sec.~2.5. The old values change by $\pm30\%$ between conse
 $\BR_s=0.02908$ (HFLAV 2023).}
 \label{fig:vus}
 \end{figure}
-Points to check in the old code (details in \texttt{OLD\_CODE\_NOTES.md}): the kernel assignment, the ignored \texttt{--t0} (the argument lands in \texttt{ND}), the absence of $\BR_s$ in the
-$\Vus$ formula, and the position of $Z_A^2$ (it should multiply $\Sigma$; in the code it divides inside the square root).
+Several points in the old code should be checked before its numbers are used (details in \texttt{OLD\_CODE\_NOTES.md}): the kernel assignment, the ignored \texttt{--t0} argument (it lands in \texttt{ND}),
+the absence of $\BR_s$ from the $\Vus$ formula, and the position of $Z_A^2$, which should multiply $\Sigma$ but divides it inside the square root.
 
 %--------------------------------------------------------------------
-\section{What is and is not shown}
+\section{What is and is not shown}\label{sec:limits}
 \begin{itemize}[leftmargin=*,itemsep=1pt]
-\item The $(0,1]$ support is \emph{excluded} by the $J=0$ data at $\ge3.3\sigma$ (48I) and $\ge9\sigma$ (64I); $[-1,1]$ is compatible. This does not depend on any $\Vus$ number.
-\item The interval is wide ($\approx\pm11\%$). It is a guarantee, not a competitive determination; the $J=1$ axial channel limits it.
-\item It is valid only if (i) $\sigma\ge0$ on $[-1,1]$ holds for this action (tested at odd $t_s$, not proven), (ii) the lowest state is the kaon, (iii) $\BR_s$ (HFLAV 2023), $Z$, $a^{-1}$, $M_0$ are correct,
-      (iv) the Gaussian error model holds. With $z=3$ and $T=18$ the statistical confidence is $\ge95\%$.
-\item Not included: continuum extrapolation (one lattice spacing each), the errors of $a^{-1}$ ($\approx0.2\%$ on $\Vus$) and $Z$, the full covariance (boxes are used), lattice artefacts of the local currents,
-      finite-volume effects beyond the positivity of the measure.
-\item Next steps: an exact free-field M\"obius check at $M_5=1.8$ (a single negative pivot would be decisive); the experimental $\BR_s$; a SOS/SDP implementation with the exact (non-grid) polynomial certificate;
-      the full covariance as an ellipsoid constraint.
+\item The $(0,1]$ support is \emph{excluded} by the $J=0$ data at $\ge3.3\sigma$ (48I) and $\ge9\sigma$ (64I), while $[-1,1]$ is compatible. This conclusion does not depend on any value of $\Vus$.
+\item The $\Vus$ interval is wide ($\approx\pm11\%$). It is a guarantee, not a competitive determination, and the $J=1$ axial channel limits it.
+\item The interval is valid only if (i) $\sigma\ge0$ on $[-1,1]$ holds for this action (tested at odd $t_s$, not proven), (ii) the lowest state is the kaon, (iii) $\BR_s$ (HFLAV 2023), $Z$, $a^{-1}$ and $M_0$ are correct,
+      and (iv) the Gaussian error model holds. With $z=3$ and $T=18$ the statistical confidence is at least $95\%$.
+\item Not included: the continuum extrapolation (each ensemble has a single lattice spacing), the errors of $a^{-1}$ ($\approx0.2\%$ on $\Vus$) and of $Z$, the full covariance (boxes are used instead),
+      lattice artefacts of the local currents, and finite-volume effects beyond the positivity of the measure.
+\item Next steps: an exact free-field M\"obius check at $M_5=1.8$, where a single negative pivot would be decisive; a sum-of-squares (SDP) implementation with an exact, grid-free certificate;
+      and the full covariance as an ellipsoid constraint, which would tighten the bounds.
 \end{itemize}
 
 %--------------------------------------------------------------------
 \appendix
 \section{Reproducing the numbers}
-All code is in \texttt{hausdorff/} of the repository; run from the directory that contains \texttt{RBCQCD/}.
+All code is in \texttt{hausdorff/} of the repository. Run it from the directory that contains \texttt{RBCQCD/}.
 \begin{center}\small
 \begin{tabular}{ll}
 \toprule
 \texttt{hankel\_scan.py} & Hausdorff positivity scan (Table~\ref{tab:hankel})\\
-\texttt{cheb\_report.py} & $\langle T^*_n\rangle$ and $\langle T_n\rangle$ (Fig.~1)\\
+\texttt{cheb\_report.py} & $\langle T^*_n\rangle$ and $\langle T_n\rangle$ (Fig.~\ref{fig:cheb})\\
 \texttt{bounds\_report.py}, \texttt{bounds\_T.py} & feasibility $z^*$ and bounds versus $T$\\
 \texttt{vus\_interval.py}, \texttt{vus\_certified.py} & channel sums, certificate check, $\Vus$ interval (\texttt{BS=...} sets $\BR_s$)\\
 \texttt{safe\_vus.py} & library and single-state calibration (\texttt{python safe\_vus.py})\\
 \texttt{old\_code\_check/} & the original \texttt{AllClass.py} run without \texttt{cupy}\\
-\texttt{paper/make\_figs.py} & figures\\
+\texttt{paper/make\_figs.py} & all figures, including the certificates of Fig.~\ref{fig:cert}\\
 \bottomrule
 \end{tabular}
 \end{center}
 Parameters: 48I: $a^{-1}=1.7295$\,GeV, $Z=0.71076$, $M_0=0.28816$, $L=48$, $N_t=96$, 88 configurations $\times$ 48 sources;
-64I: $a^{-1}=2.3586$\,GeV, $Z=0.74293$, $M_0=0.21539$, $L=64$, $N_t=128$, 40 $\times$ 64 (the split is inferred from the row count; the Hankel scan gives identical verdicts for $40\times64$ and $80\times32$).
+64I: $a^{-1}=2.3586$\,GeV, $Z=0.74293$, $M_0=0.21539$, $L=64$, $N_t=128$, 40 $\times$ 64. The 64I split is inferred from the row count; the Hankel scan gives identical verdicts for $40\times64$ and $80\times32$.
 
 \begin{thebibliography}{9}
+\bibitem{Chen:TauNote} W.-L.~Chen, F.~Callet, \emph{The tau inclusive hadronic decay from lattice QCD}, internal note (2024), \texttt{TauDecay.pdf} in this repository.
 \bibitem{Syritsyn:2007} S.~Syritsyn, J.~W.~Negele, \emph{Oscillatory terms in the domain wall transfer matrix}, PoS LATTICE2007 (2007) 078, arXiv:0710.0425.
 \bibitem{Schmudgen:2020} K.~Schm\"udgen, \emph{Ten lectures on the moment problem}, arXiv:2008.12698.
 \bibitem{Hashimoto:2017} S.~Hashimoto, PTEP 2017 (2017) 053B03, arXiv:1703.01881.
 \bibitem{Bailas:2020} G.~Bailas, S.~Hashimoto, T.~Ishikawa, PTEP 2020 (2020) 043B07, arXiv:2001.11779.
 \bibitem{Gambino:2020} P.~Gambino, S.~Hashimoto, Phys.\ Rev.\ Lett.\ 125 (2020) 032001, arXiv:2005.13730.
-\bibitem{Boyle:2018} P.~Boyle et al., Phys.\ Rev.\ Lett.\ 121 (2018) 202003, arXiv:1803.07228.
-\bibitem{RBC:2016} T.~Blum et al.\ (RBC/UKQCD), Phys.\ Rev.\ D 93 (2016) 074505, arXiv:1411.7017.
-\bibitem{Abbott:2025} Abbott, Jay, Oare, arXiv:2508.01377.
 \end{thebibliography}
 \end{document}
